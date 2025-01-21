@@ -92,17 +92,27 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Function to run backend script and return output
-def run_backend_script(script_name, *args):
+# Function to run a script and stream output
+def stream_script_output(script_name, *args):
     try:
-        result = subprocess.run(
+        process = subprocess.Popen(
             ['python', script_name, *map(str, args)],
-            capture_output=True,
-            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True
         )
-        return result.stdout + result.stderr
+        # Stream output line by line
+        output_placeholder = st.empty()
+        for line in iter(process.stdout.readline, ''):
+            if line:  # Skip empty lines
+                output_placeholder.text(line.strip())
+        process.stdout.close()
+        process.wait()
+        if process.returncode != 0:
+            error = process.stderr.read()
+            st.error(f"Script returned an error:\n{error}")
     except Exception as e:
-        return f"Error running the script: {str(e)}"
+        st.error(f"Error running the script: {str(e)}")
 
 # Header
 st.markdown('<div class="header"><h1>IPO NASDAQ</h1></div>', unsafe_allow_html=True)
@@ -113,24 +123,17 @@ col1, col2, col3 = st.columns(3)
 # First Column - Script 1
 with col1:
     if st.button("Run Script 1", key="script_1"):
-        output = run_backend_script("backend.py", "default_name", "default_id")
         st.markdown("### Script 1 Output:")
-        st.code(output, language="text")
+        stream_script_output("backend.py", "default_name", "default_id")
 
 # Second Column - Script 2
 with col2:
     if st.button("Run Script 2", key="script_2"):
-        output = run_backend_script("script2.py")
         st.markdown("### Script 2 Output:")
-        st.code(output, language="text")
+        stream_script_output("script2.py")
 
 # Third Column - Script 3
 with col3:
     if st.button("Run Script 3", key="script_3"):
-        output = run_backend_script("script3.py")
         st.markdown("### Script 3 Output:")
-        st.code(output, language="text")
-
-      
-
-    
+        stream_script_output("script3.py")
