@@ -46,6 +46,91 @@ submit.addEventListener("click", (e) => {
 fetchWeather('Delhi');
 
 
+
+import streamlit as st
+import subprocess
+
+# Set page configuration
+st.set_page_config(page_title="IPO NASDAQ", layout="wide")
+
+# Custom styles for the Streamlit app
+st.markdown("""
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+        }
+
+        .header {
+            background-color: rgb(0, 183, 255);
+            color: white;
+            text-align: center;
+            padding: 10px 0;
+            margin-bottom: 20px;
+            border-radius: 5px;
+        }
+
+        .section {
+            padding: 20px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        .stButton>button {
+            background-color: rgb(0, 208, 255);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px; 
+            margin-top: 20px;
+        }
+
+        .stButton>button:hover {
+            background-color: #45a049;
+        }
+    </style>
+""", unsafe_allow_html=True)
+
+# Function to run backend script and return output
+def run_backend_script(script_name, *args):
+    try:
+        result = subprocess.run(
+            ['python', script_name, *map(str, args)],
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout + result.stderr
+    except Exception as e:
+        return f"Error running the script: {str(e)}"
+
+# Header
+st.markdown('<div class="header"><h1>IPO NASDAQ</h1></div>', unsafe_allow_html=True)
+
+# Create three columns for the buttons
+col1, col2, col3 = st.columns(3)
+
+# First Column - Script 1
+with col1:
+    if st.button("Run Script 1", key="script_1"):
+        output = run_backend_script("backend.py", "default_name", "default_id")
+        st.markdown("### Script 1 Output:")
+        st.code(output, language="text")
+
+# Second Column - Script 2
+with col2:
+    if st.button("Run Script 2", key="script_2"):
+        output = run_backend_script("script2.py")
+        st.markdown("### Script 2 Output:")
+        st.code(output, language="text")
+
+# Third Column - Script 3
+with col3:
+    if st.button("Run Script 3", key="script_3"):
+        output = run_backend_script("script3.py")
+        st.markdown("### Script 3 Output:")
+        st.code(output, language="text")
+
       
 
     
