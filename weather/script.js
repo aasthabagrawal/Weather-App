@@ -47,106 +47,29 @@ fetchWeather('Delhi');
 
 
 
-import streamlit as st
-import subprocess
+from fastapi import FastAPI, WebSocket
+from fastapi.responses import HTMLResponse
+from pathlib import Path
 
-# Set page configuration, horizontal textbox
-st.set_page_config(page_title="NASDAQ: IPO STAGING", layout="wide")
+app = FastAPI()
 
-# Custom styles for the Streamlit app
-st.markdown("""
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-        }
+# Route to serve the front.html file
+@app.get("/")
+async def get_frontend():
+    file_path = Path(__file__).parent / "templates" / "front.html"
+    if file_path.exists():
+        return HTMLResponse(content=file_path.read_text(), status_code=200)
+    return {"detail": "front.html not found"}
 
-        .header {
-            background-color: rgb(0, 183, 255);
-            color: white;
-            text-align: center;
-            padding: 10px 0;
-            margin-bottom: 20px;
-            border-radius: 5px;
-        }
-
-        .section {
-            padding: 20px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            background-color: #f9f9f9;
-            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
-        }
-
-        .stButton>button {
-            background-color: rgb(0, 208, 255);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 16px; 
-            margin-top: 20px;
-        }
-
-        .stButton>button:hover {
-            background-color: #45a049;
-        }
-    </style>
-""", unsafe_allow_html=True)
-
-# Function to run backend script and return output
-def run_backend_script(script_name, *args):
+# WebSocket endpoint
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await websocket.accept()
     try:
-        result = subprocess.run(
-            ['python', script_name] + list(map(str, args)),
-            capture_output=True,
-            text=True,
-        )
-        return result.stdout + result.stderr
+        while True:
+            data = await websocket.receive_text()
+            print(f"Received: {data}")
+            await websocket.send_text(f"Backend received: {data}")
     except Exception as e:
-        return f"Error running the script: {str(e)}"
-
-# Initialize session state variables
-if "show_inputs" not in st.session_state:
-    st.session_state.show_inputs = False
-
-# Header
-st.markdown('<div class="header"><h1>NASDAQ: IPO STAGING</h1></div>', unsafe_allow_html=True)
-
-# Create three columns for the textboxes
-col1, col2, col3 = st.columns(3)
-
-# First Column - Script 1
-with col1:
-    if st.button("Run Script 1", key="Script 1"):
-        st.session_state.show_inputs = True  # Show input fields when button is clicked
-
-    if st.session_state.show_inputs:
-        # Input fields for Script 1
-        emp_name = st.text_input("Enter employee name:")
-        emp_id = st.text_input("Enter employee ID:")
-        '''amg_point_person1 = st.text_input("Enter AMG Point Person 1:")
-        amg_point_person2 = st.text_input("Enter AMG Point Person 2:")
-        ipo_execution_officer = st.text_input("Enter IPO Execution Officer:")
-        tss_app_support = st.text_input("Enter TSS App Support:")
-        market_ops_support = st.text_input("Enter Market Ops Support:")
-        cnopts = st.text_input("Enter CNOPTS:")'''
-
-        # Check if all fields are filled
-        if st.button("Submit Script 1"):
-            if all([emp_name, emp_id, amg_point_person1, amg_point_person2, ipo_execution_officer, 
-                    tss_app_support, market_ops_support, cnopts]):
-                # Run the backend script and display output
-                output = run_backend_script('backend.py', emp_name, emp_id, amg_point_person1, amg_point_person2, 
-                                           ipo_execution_officer, tss_app_support, market_ops_support, cnopts)
-                st.text_area("Script 1 Output", output, height=300)
-            else:
-                st.warning("Please fill in all the fields before submitting.")
-
-# Second Column - Placeholder for Script 2
-with col2:
-    if st.button("Run Script 2", key="Script 2"):
-        st.success("Script 2 is running...")
-
-# Third Column - Placeholder for Script 3
-with col3:
-    if st.button("Run Script 3", key="Script 3"):
-        st.success("Script 3 is running...")
+        print(f"WebSocket error: {e}")
+        await websocket.close()
