@@ -50,8 +50,8 @@ fetchWeather('Delhi');
 import streamlit as st
 import subprocess
 
-# Set page configuration
-st.set_page_config(page_title="IPO NASDAQ", layout="wide")
+# Set page configuration, horizontal textbox
+st.set_page_config(page_title="NASDAQ: IPO STAGING", layout="wide")
 
 # Custom styles for the Streamlit app
 st.markdown("""
@@ -92,48 +92,61 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Function to run a script and stream output
-def stream_script_output(script_name, *args):
+# Function to run backend script and return output
+def run_backend_script(script_name, *args):
     try:
-        process = subprocess.Popen(
-            ['python', script_name, *map(str, args)],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True
+        result = subprocess.run(
+            ['python', script_name] + list(map(str, args)),
+            capture_output=True,
+            text=True,
         )
-        # Stream output line by line
-        output_placeholder = st.empty()
-        for line in iter(process.stdout.readline, ''):
-            if line:  # Skip empty lines
-                output_placeholder.text(line.strip())
-        process.stdout.close()
-        process.wait()
-        if process.returncode != 0:
-            error = process.stderr.read()
-            st.error(f"Script returned an error:\n{error}")
+        return result.stdout + result.stderr
     except Exception as e:
-        st.error(f"Error running the script: {str(e)}")
+        return f"Error running the script: {str(e)}"
+
+# Initialize session state variables
+if "show_inputs" not in st.session_state:
+    st.session_state.show_inputs = False
 
 # Header
-st.markdown('<div class="header"><h1>IPO NASDAQ</h1></div>', unsafe_allow_html=True)
+st.markdown('<div class="header"><h1>NASDAQ: IPO STAGING</h1></div>', unsafe_allow_html=True)
 
-# Create three columns for the buttons
+# Create three columns for the textboxes
 col1, col2, col3 = st.columns(3)
 
 # First Column - Script 1
 with col1:
-    if st.button("Run Script 1", key="script_1"):
-        st.markdown("### Script 1 Output:")
-        stream_script_output("backend.py", "default_name", "default_id")
+    if st.button("Run Script 1", key="Script 1"):
+        st.session_state.show_inputs = True  # Show input fields when button is clicked
 
-# Second Column - Script 2
+    if st.session_state.show_inputs:
+        # Input fields for Script 1
+        emp_name = st.text_input("Enter employee name:")
+        emp_id = st.text_input("Enter employee ID:")
+        amg_point_person1 = st.text_input("Enter AMG Point Person 1:")
+        amg_point_person2 = st.text_input("Enter AMG Point Person 2:")
+        ipo_execution_officer = st.text_input("Enter IPO Execution Officer:")
+        tss_app_support = st.text_input("Enter TSS App Support:")
+        market_ops_support = st.text_input("Enter Market Ops Support:")
+        cnopts = st.text_input("Enter CNOPTS:")
+
+        # Check if all fields are filled
+        if st.button("Submit Script 1"):
+            if all([emp_name, emp_id, amg_point_person1, amg_point_person2, ipo_execution_officer, 
+                    tss_app_support, market_ops_support, cnopts]):
+                # Run the backend script and display output
+                output = run_backend_script('backend.py', emp_name, emp_id, amg_point_person1, amg_point_person2, 
+                                           ipo_execution_officer, tss_app_support, market_ops_support, cnopts)
+                st.text_area("Script 1 Output", output, height=300)
+            else:
+                st.warning("Please fill in all the fields before submitting.")
+
+# Second Column - Placeholder for Script 2
 with col2:
-    if st.button("Run Script 2", key="script_2"):
-        st.markdown("### Script 2 Output:")
-        stream_script_output("script2.py")
+    if st.button("Run Script 2", key="Script 2"):
+        st.success("Script 2 is running...")
 
-# Third Column - Script 3
+# Third Column - Placeholder for Script 3
 with col3:
-    if st.button("Run Script 3", key="script_3"):
-        st.markdown("### Script 3 Output:")
-        stream_script_output("script3.py")
+    if st.button("Run Script 3", key="Script 3"):
+        st.success("Script 3 is running...")
