@@ -35,7 +35,6 @@ const fetchWeather = async (city) => {
 
 // Initial fetch for default city
 
-
 // Add event listener for the form submission
 submit.addEventListener("click", (e) => {
     e.preventDefault();
@@ -87,12 +86,15 @@ fetchWeather('Delhi');
       background-color: #28a745;
       color: #fff;
     }
+    .button:focus {
+      outline: 2px solid #555; /* Accessibility improvement */
+    }
     #terminal-container {
       margin: 20px auto;
       width: 80%;
       height: 400px;
       border: 1px solid #333;
-      text-align: left; /* Ensures text is left-aligned */
+      overflow: hidden;
     }
   </style>
 </head>
@@ -106,30 +108,33 @@ fetchWeather('Delhi');
   <div id="terminal-container"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
-  <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+  
   <script>
-    const terminalContainer = document.getElementById("terminal-container");
-    const runScriptButton = document.getElementById("run-script");
-    const term = new Terminal({ convertEol: true }); // Ensures newlines work correctly
-    term.open(terminalContainer);
+  const terminalContainer = document.getElementById("terminal-container");
+  const runScriptButton = document.getElementById("run-script");
+  const term = new Terminal({ convertEol: true }); // Ensures newlines work correctly
+  term.open(terminalContainer);
 
-    let socket;
-    let inputBuffer = ""; // Buffer for user input
+  let socket;
+  let inputBuffer = ""; // Buffer for user input
 
-    runScriptButton.addEventListener("click", () => {
-      term.write("Connecting to backend...\r\n");
+  runScriptButton.addEventListener("click", () => {
+    // Reset the terminal to clear everything and start fresh
+    term.reset();
 
-      // Connect to the backend using Socket.IO
-      socket = io.connect();
+    term.write("Connecting to backend...\r\n");
+    try {
+      // Use template string syntax for WebSocket URL
+      socket = new WebSocket(`ws://${location.host}/ws`);
 
-      socket.on('connect', () => {
+      socket.onopen = () => {
         term.write("Connection established. Please enter your details below:\r\n");
 
         // Listen for user input and process it
         term.onData((data) => {
           if (data === "\r") {
             // When Enter is pressed, send the buffered input to the backend
-            socket.emit('run_command', { name: inputBuffer.split(',')[0], emp_id: inputBuffer.split(',')[1] });
+            socket.send(inputBuffer);
             inputBuffer = ""; // Clear the buffer
             term.write("\r\n"); // Move to the next line
           } else if (data === "\u007F") {
@@ -144,14 +149,24 @@ fetchWeather('Delhi');
             term.write(data);
           }
         });
-      });
+      };
 
       // Display messages from the backend in the terminal
-      socket.on('response', (message) => term.write(message + '\r\n'));
-      socket.on('disconnect', () => term.write("\r\nConnection closed.\r\n"));
-      socket.on('error', (err) => term.write(`\r\nSocket.IO Error: ${JSON.stringify(err)}\r\n`));
-    });
-  </script>
+      socket.onmessage = (event) => term.write(event.data);
+      socket.onclose = () => term.write("\r\nConnection closed.\r\n");
+      socket.onerror = (err) => term.write(`\r\nWebSocket Error: ${JSON.stringify(err)}\r\n`);
+    } catch (error) {
+      term.write(`\r\nFailed to connect: ${error.message}\r\n`);
+    }
+  });
+
+  // Close WebSocket on page unload
+  window.addEventListener("beforeunload", () => {
+    if (socket) {
+      socket.close();
+    }
+  });
+</script>
 </body>
 </html>
 
@@ -180,28 +195,33 @@ def websocket_handler(ws):
             user_id = ws.receive().strip()
 
             # Step 3: Send inputs to backend logic
-            # Using subprocess to call backend.py (or implement backend logic directly here)
             process = subprocess.Popen(
-                ["python", "backend.py"],  # backend.py will take inputs dynamically
+                ["python", "backend.py"],  # Call backend script
                 stdin=subprocess.PIPE,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True
             )
 
-            # Pass inputs to backend.py (as a single string "name,id")
+            # Pass inputs to backend.py
             backend_input = f"{user_name},{user_id}\n"
-            stdout, stderr = process.communicate(input=backend_input)
+            process.stdin.write(backend_input)
+            process.stdin.close()  # Close stdin to signal end of input
 
-            # Step 4: Return backend results to the client
-            if stdout:
-                ws.send(stdout)
-            if stderr:
-                ws.send(f"Error: {stderr}")
+            # Step 4: Stream backend results to the client
+            for line in process.stdout:
+                ws.send(line)  # Send each line to the client in real-time
+
+            # Stream any error messages to the client
+            for error in process.stderr:
+                ws.send(f"Error: {error}")
+
+            process.wait()  # Wait for the process to complete
 
         except Exception as e:
             ws.send(f"Error: {str(e)}")
             break
+
 
 
 if __name__ == '__main__':
@@ -231,3 +251,4 @@ try:
         print(f"Welcome, {name.capitalize()}!")
 except ValueError:
     print("Error: Invalid input format. Please provide both name and ID.")
+
