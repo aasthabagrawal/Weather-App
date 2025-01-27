@@ -45,130 +45,65 @@ submit.addEventListener("click", (e) => {
 fetchWeather('Delhi');
 
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TERMINAL APP</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm/css/xterm.css">
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      margin: 0;
-      padding: 0;
-      background-color: #f4f4f4;
-    }
-    .header {
-      background: #333;
-      color: #fff;
-      padding: 20px;
-      font-size: 24px;
-      text-align: center;
-    }
-    .button-container {
-      margin: 20px;
-      text-align: center;
-    }
-    .button {
-      margin: 10px;
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-      border: none;
-      border-radius: 5px;
-    }
-    .dummy {
-      background-color: #ccc;
-      color: #333;
-    }
-    .run {
-      background-color: #28a745;
-      color: #fff;
-    }
-    .button:focus {
-      outline: 2px solid #555; /* Accessibility improvement */
-    }
-    #terminal-container {
-      margin: 20px auto;
-      width: 80%;
-      height: 400px;
-      border: 1px solid #333;
-      overflow: hidden;
-    }
-  </style>
-</head>
-<body>
-  <div class="header">TERMINAL APP</div>
-  <div class="button-container">
-    <button class="button dummy">Dummy Button 1</button>
-    <button class="button dummy">Dummy Button 2</button>
-    <button class="button run" id="run-script">Run Script 1</button>
-  </div>
-  <div id="terminal-container"></div>
+runScriptButton.addEventListener("click", () => {
+  // Close any existing WebSocket connection
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.onclose = null; // Remove the old onclose handler
+    socket.onerror = null; // Remove the old onerror handler
+    socket.onmessage = null; // Remove the old onmessage handler
+    socket.close();
+  }
 
-  <script src="https://cdn.jsdelivr.net/npm/xterm/lib/xterm.js"></script>
-  
-  <script>
-  const terminalContainer = document.getElementById("terminal-container");
-  const runScriptButton = document.getElementById("run-script");
-  const term = new Terminal({ convertEol: true }); // Ensures newlines work correctly
-  term.open(terminalContainer);
+  // Reset the terminal
+  term.reset();
+  inputBuffer = ""; // Clear the input buffer
 
-  let socket;
-  let inputBuffer = ""; // Buffer for user input
+  term.write("Connecting to backend...\r\n");
 
-  runScriptButton.addEventListener("click", () => {
-    // Reset the terminal to clear everything and start fresh
-    term.reset();
+  try {
+    // Establish a new WebSocket connection
+    socket = new WebSocket(`ws://${location.host}/ws`);
 
-    term.write("Connecting to backend...\r\n");
-    try {
-      // Use template string syntax for WebSocket URL
-      socket = new WebSocket(`ws://${location.host}/ws`);
+    socket.onopen = () => {
+      term.write("Connection established. Please enter your details below:\r\n");
 
-      socket.onopen = () => {
-        term.write("Connection established. Please enter your details below:\r\n");
+      // Remove the previous input handler, if any
+      if (inputHandler) {
+        term.offData(inputHandler); // Remove the old listener explicitly
+      }
 
-        // Listen for user input and process it
-        term.onData((data) => {
-          if (data === "\r") {
-            // When Enter is pressed, send the buffered input to the backend
-            socket.send(inputBuffer);
-            inputBuffer = ""; // Clear the buffer
-            term.write("\r\n"); // Move to the next line
-          } else if (data === "\u007F") {
-            // Handle Backspace
-            if (inputBuffer.length > 0) {
-              inputBuffer = inputBuffer.slice(0, -1); // Remove last character
-              term.write("\b \b"); // Remove character visually in terminal
-            }
-          } else {
-            // Append typed character to the buffer and display it
-            inputBuffer += data;
-            term.write(data);
+      // Define the input handler
+      inputHandler = (data) => {
+        if (data === "\r") {
+          // When Enter is pressed, send the buffered input to the backend
+          socket.send(inputBuffer);
+          inputBuffer = ""; // Clear the buffer
+          term.write("\r\n"); // Move to the next line
+        } else if (data === "\u007F") {
+          // Handle Backspace
+          if (inputBuffer.length > 0) {
+            inputBuffer = inputBuffer.slice(0, -1); // Remove last character
+            term.write("\b \b"); // Remove character visually in terminal
           }
-        });
+        } else {
+          // Append typed character to the buffer and display it
+          inputBuffer += data;
+          term.write(data);
+        }
       };
 
-      // Display messages from the backend in the terminal
-      socket.onmessage = (event) => term.write(event.data);
-      socket.onclose = () => term.write("\r\nConnection closed.\r\n");
-      socket.onerror = (err) => term.write(`\r\nWebSocket Error: ${JSON.stringify(err)}\r\n`);
-    } catch (error) {
-      term.write(`\r\nFailed to connect: ${error.message}\r\n`);
-    }
-  });
+      // Attach the new input handler
+      term.onData(inputHandler);
+    };
 
-  // Close WebSocket on page unload
-  window.addEventListener("beforeunload", () => {
-    if (socket) {
-      socket.close();
-    }
-  });
-</script>
-</body>
-</html>
+    // Handle WebSocket events
+    socket.onmessage = (event) => term.write(event.data);
+    socket.onclose = () => term.write("\r\nConnection closed.\r\n");
+    socket.onerror = (err) => term.write(`\r\nWebSocket Error: ${JSON.stringify(err)}\r\n`);
+  } catch (error) {
+    term.write(`\r\nFailed to connect: ${error.message}\r\n`);
+  }
+});
 
 
 from flask import Flask, render_template
