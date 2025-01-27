@@ -1,3 +1,71 @@
+runScriptButton.addEventListener("click", () => {
+  // Close any existing WebSocket connection
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.onclose = null; // Remove the old onclose handler
+    socket.onerror = null; // Remove the old onerror handler
+    socket.onmessage = null; // Remove the old onmessage handler
+    socket.close();
+  }
+
+  // Reset the terminal
+  term.reset();
+  inputBuffer = ""; // Clear the input buffer
+
+  term.write("Connecting to backend...\r\n");
+
+  try {
+    // Establish a new WebSocket connection
+    socket = new WebSocket(`ws://${location.host}/ws`);
+
+    socket.onopen = () => {
+      term.write("Connection established. Please enter your details below:\r\n");
+
+      // Remove the previous input handler, if any
+      if (inputHandler) {
+        term.offData(inputHandler); // Remove the old listener explicitly
+      }
+
+      // Define the input handler
+      inputHandler = (data) => {
+        if (data === "\r") {
+          // When Enter is pressed, send the buffered input to the backend
+          term.write("\r\nWaiting for response...\r\n"); // Display waiting message
+          socket.send(inputBuffer);
+          inputBuffer = ""; // Clear the buffer
+        } else if (data === "\u007F") {
+          // Handle Backspace
+          if (inputBuffer.length > 0) {
+            inputBuffer = inputBuffer.slice(0, -1); // Remove last character
+            term.write("\b \b"); // Remove character visually in terminal
+          }
+        } else {
+          // Append typed character to the buffer and display it
+          inputBuffer += data;
+          term.write(data);
+        }
+      };
+
+      // Attach the new input handler
+      term.onData(inputHandler);
+    };
+
+    // Handle WebSocket events
+    socket.onmessage = (event) => {
+      term.write(`\r\n${event.data}\r\n`); // Display the backend response
+    };
+
+    socket.onclose = () => {
+      term.write("\r\nConnection closed.\r\n");
+    };
+
+    socket.onerror = (err) => {
+      term.write(`\r\nWebSocket Error: ${JSON.stringify(err)}\r\n`);
+    };
+  } catch (error) {
+    term.write(`\r\nFailed to connect: ${error.message}\r\n`);
+  }
+});
+
 const options = {
     method: 'GET',
     headers: {
