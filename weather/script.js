@@ -114,6 +114,119 @@ fetchWeather('Delhi');
 
 
 
+<style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background-color: #f4f4f4;
+      
+    }
+
+    .header {
+      background: #333;
+      color: #fff;
+      padding: 1rem;
+      font-size: 24px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .parent-container {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      padding: 1rem;
+      flex-grow: 1;
+      height: 100%; 
+    }
+
+    .button-container {
+      margin-top: 1rem;
+      display: flex;
+      gap: 100px;
+    }
+
+    .button {
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border: none;
+      border-radius: 5px;
+    }
+
+    .dummy {
+      background-color: #ccc;
+      color: #333;
+    }
+
+    .run {
+      background-color: #28a745;
+      color: #fff;
+    }
+
+    #terminal-container {
+      width: 90%;
+      height: 100%;
+      flex-grow: 1;
+      border: 1px solid #333;
+      background-color: black;
+      margin-top: 1rem;
+      overflow: hidden;
+      display: flex;
+      padding-bottom: 2 rem;
+    }
+
+    /* Ensure the terminal fills the container properly */
+    .xterm {
+      flex-grow: 1;
+      width: 95% !important;
+      height: 100% !important;
+      display: flex;
+      overflow: hidden;
+    }
+
+    /* Fix scrollbar position */
+    .xterm-viewport {
+      right: 0;
+      width: 100% !important;
+    }
+  </style>
 
 
+const runScriptButton = document.getElementById("run-script");
+  const term = new Terminal({ convertEol: true, wordWrap: true}); // Ensures newlines work correctly
+  term.open(terminalContainer);
 
+
+  function resizeTerminal() {
+  const container = document.getElementById("terminal-container");
+   // Force reflow to fix incorrect resizing
+   container.style.display = "none";
+  container.offsetHeight; // Trigger reflow
+  container.style.display = "flex";
+
+  const width = container.clientWidth * 0.95;  // Maintain 95% width
+  const height = container.clientHeight;       // Keep full height
+  
+  const cols = Math.floor(width / 9);  // Approximate character width
+  const rows = Math.floor(height / 18); // Approximate character height
+  term.resize(cols, rows);
+}
+
+window.addEventListener("resize", resizeTerminal);
+resizeTerminal();  // Call initially to set correct size
+
+  const container = document.getElementById('terminal-container');
+
+  //term.resize(1000,1000);
+  let socket; // Declare the socket outside for reuse
