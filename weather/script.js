@@ -1,71 +1,3 @@
-runScriptButton.addEventListener("click", () => {
-  // Close any existing WebSocket connection
-  if (socket && socket.readyState === WebSocket.OPEN) {
-    socket.onclose = null; // Remove the old onclose handler
-    socket.onerror = null; // Remove the old onerror handler
-    socket.onmessage = null; // Remove the old onmessage handler
-    socket.close();
-  }
-
-  // Reset the terminal
-  term.reset();
-  inputBuffer = ""; // Clear the input buffer
-
-  term.write("Connecting to backend...\r\n");
-
-  try {
-    // Establish a new WebSocket connection
-    socket = new WebSocket(`ws://${location.host}/ws`);
-
-    socket.onopen = () => {
-      term.write("Connection established. Please enter your details below:\r\n");
-
-      // Remove the previous input handler, if any
-      if (inputHandler) {
-        term.offData(inputHandler); // Remove the old listener explicitly
-      }
-
-      // Define the input handler
-      inputHandler = (data) => {
-        if (data === "\r") {
-          // When Enter is pressed, send the buffered input to the backend
-          term.write("\r\nWaiting for response...\r\n"); // Display waiting message
-          socket.send(inputBuffer);
-          inputBuffer = ""; // Clear the buffer
-        } else if (data === "\u007F") {
-          // Handle Backspace
-          if (inputBuffer.length > 0) {
-            inputBuffer = inputBuffer.slice(0, -1); // Remove last character
-            term.write("\b \b"); // Remove character visually in terminal
-          }
-        } else {
-          // Append typed character to the buffer and display it
-          inputBuffer += data;
-          term.write(data);
-        }
-      };
-
-      // Attach the new input handler
-      term.onData(inputHandler);
-    };
-
-    // Handle WebSocket events
-    socket.onmessage = (event) => {
-      term.write(`\r\n${event.data}\r\n`); // Display the backend response
-    };
-
-    socket.onclose = () => {
-      term.write("\r\nConnection closed.\r\n");
-    };
-
-    socket.onerror = (err) => {
-      term.write(`\r\nWebSocket Error: ${JSON.stringify(err)}\r\n`);
-    };
-  } catch (error) {
-    term.write(`\r\nFailed to connect: ${error.message}\r\n`);
-  }
-});
-
 const options = {
     method: 'GET',
     headers: {
@@ -113,120 +45,146 @@ submit.addEventListener("click", (e) => {
 fetchWeather('Delhi');
 
 
+data_pg.html
 
-<style>
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Page</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='scripts.css') }}">
+    <script>
+        let currentFile = "";  // Stores which file is being viewed
 
-    body {
-      font-family: Arial, sans-serif;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      background-color: #f4f4f4;
-      
-    }
+        function fetchCSV(type) {
+            currentFile = type;  // Store the last selected file
+            updateTable();  // Load immediately
+        }
 
-    .header {
-      background: #333;
-      color: #fff;
-      padding: 1rem;
-      font-size: 24px;
-      width: 100%;
-      text-align: center;
-    }
+        function updateTable() {
+            if (!currentFile) return;  // If no file is selected, do nothing
 
-    .parent-container {
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      width: 100%;
-      padding: 1rem;
-      flex-grow: 1;
-      height: 100%; 
-    }
+            fetch(`/get_csv?file=${currentFile}`)
+                .then(response => response.text())
+                .then(data => {
+                    let displayDiv = document.getElementById('csv_display');
+                    displayDiv.innerHTML = data;
+                    displayDiv.style.display = "block";  // Show table
+                })
+                .catch(error => {
+                    document.getElementById('csv_display').innerHTML = `<p style="color:red;">Error loading data: ${error}</p>`;
+                });
+        }
 
-    .button-container {
-      margin-top: 1rem;
-      display: flex;
-      gap: 100px;
-    }
+        // Automatically refresh every 5 seconds
+        setInterval(updateTable, 5000);
+    </script>
+    <style>
+        #csv_display {
+            display: none;  /* Hide table initially */
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background-color: #f9f9f9;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">TERMINAL APP</div>
 
-    .button {
-      padding: 10px 20px;
-      font-size: 16px;
-      cursor: pointer;
-      border: none;
-      border-radius: 5px;
-    }
+    <div class="initial_container">
+        <button onclick="fetchCSV('input')" class="initial_button">Input File</button>
+        <button onclick="fetchCSV('output')" class="initial_button">Output File</button>
+    </div>
 
-    .dummy {
-      background-color: #ccc;
-      color: #333;
-    }
-
-    .run {
-      background-color: #28a745;
-      color: #fff;
-    }
-
-    #terminal-container {
-      width: 90%;
-      height: 100%;
-      flex-grow: 1;
-      border: 1px solid #333;
-      background-color: black;
-      margin-top: 1rem;
-      overflow: hidden;
-      display: flex;
-      padding-bottom: 2 rem;
-    }
-
-    /* Ensure the terminal fills the container properly */
-    .xterm {
-      flex-grow: 1;
-      width: 95% !important;
-      height: 100% !important;
-      display: flex;
-      overflow: hidden;
-    }
-
-    /* Fix scrollbar position */
-    .xterm-viewport {
-      right: 0;
-      width: 100% !important;
-    }
-  </style>
+    <div id="csv_display" class="csv_table_container">
+        <!-- Table will only appear after clicking a button -->
+    </div>
+</body>
+</html>
 
 
-const runScriptButton = document.getElementById("run-script");
-  const term = new Terminal({ convertEol: true, wordWrap: true}); // Ensures newlines work correctly
-  term.open(terminalContainer);
+app.py
+from flask import Flask, render_template, request
+from flask_sock import Sock
+import subprocess
+import os
+import pandas as pd
 
+app = Flask(__name__)
+sock = Sock(app)
 
-  function resizeTerminal() {
-  const container = document.getElementById("terminal-container");
-   // Force reflow to fix incorrect resizing
-   container.style.display = "none";
-  container.offsetHeight; // Trigger reflow
-  container.style.display = "flex";
+@app.route('/')
+def home():
+    return render_template('main.html')
 
-  const width = container.clientWidth * 0.95;  // Maintain 95% width
-  const height = container.clientHeight;       // Keep full height
-  
-  const cols = Math.floor(width / 9);  // Approximate character width
-  const rows = Math.floor(height / 18); // Approximate character height
-  term.resize(cols, rows);
-}
+@app.route('/scripts')
+def scripts():
+    return render_template('scripts.html')
 
-window.addEventListener("resize", resizeTerminal);
-resizeTerminal();  // Call initially to set correct size
+@app.route('/data_pg')
+def data_pg():
+    return render_template('data_pg.html')
 
-  const container = document.getElementById('terminal-container');
+@app.route('/get_csv')
+def get_csv():
+    file_type = request.args.get('file')
 
-  //term.resize(1000,1000);
-  let socket; // Declare the socket outside for reuse
+    # Determine which file to fetch
+    if file_type == 'input':
+        file_path = 'ipoinput.csv'
+    elif file_type == 'output':
+        file_path = 'ipooutput.csv'
+    else:
+        return "Invalid file type", 400
+
+    if not os.path.exists(file_path):
+        return "<p style='color:red;'>CSV file not found</p>", 404
+
+    try:
+        df = pd.read_csv(file_path)
+        return df.to_html(classes='table table-striped', index=False)
+    except Exception as e:
+        return f"<p style='color:red;'>Error reading CSV: {e}</p>", 500
+
+@sock.route('/ws')
+def websocket_handler(ws):
+    while True:
+        try:
+            ws.send(">> Enter your name: ")
+            user_name = ws.receive().strip()
+
+            ws.send(">> Enter your employee ID: ")
+            user_id = ws.receive().strip()
+
+            process = subprocess.Popen(
+                ["python", "backend.py"],
+                stdin=subprocess.PIPE,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True
+            )
+
+            backend_input = f"{user_name},{user_id}\n"
+            process.stdin.write(backend_input)
+            process.stdin.flush()
+            process.stdin.close()
+
+            for line in process.stdout:
+                ws.send(line)
+
+            for error in process.stderr:
+                ws.send(f"Error: {error}")
+
+            process.wait()
+
+        except Exception as e:
+            ws.send(f"Error: {str(e)}")
+            break
+
+if __name__ == '__main__':
+    app.run(debug=True)
+
+    
