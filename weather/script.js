@@ -1,3 +1,69 @@
+let currentFile = "";
+    let activeSymbolFilters = new Set();
+    let activeDateFilters = new Set();
+    let symbolColumnIndex = -1;
+    let dateColumnIndex = -1;
+
+    function fetchCSV(type) {
+      currentFile = type;
+      updateTable();
+    }
+
+    function updateTable() {
+      if (!currentFile) return;
+
+      fetch(`/get_csv?file=${currentFile}`)
+        .then(response => response.text())
+        .then(data => {
+          let displayDiv = document.getElementById('csv_display');
+          displayDiv.innerHTML = data;
+          displayDiv.style.display = "block";
+
+
+          const table = displayDiv.querySelector("table");
+      if (table) {
+        table.setAttribute("id", "ipoTable");
+        // Auto-sort by IPO Date if the file is output
+        if (currentFile === 'output') {
+          addSymbolFilter();
+          addDateFilter();
+        }
+        autoSortByDate("ipoTable"); // Always sort by date
+      }
+    })
+    .catch(error => {
+      document.getElementById('csv_display').innerHTML = `<p style="color:red;">Error loading data: ${error}</p>`;
+    });
+}
+
+function autoSortByDate(tableId) {
+  const table = document.getElementById(tableId);
+  if (!table) return;
+
+  const rows = Array.from(table.rows).slice(1); // Skip the header row
+  const dateColumnIndex = findDateColumnIndex(table);
+
+  if (dateColumnIndex === -1) return;
+
+  rows.sort((a, b) => {
+    const dateA = new Date(a.cells[dateColumnIndex].innerText.trim());
+    const dateB = new Date(b.cells[dateColumnIndex].innerText.trim());
+    return dateB - dateA; // Descending order
+  });
+
+  rows.forEach(row => table.appendChild(row)); // Append sorted rows
+}
+
+function findDateColumnIndex(table) {
+  const headerCells = table.rows[0].cells;
+  for (let i = 0; i < headerCells.length; i++) {
+    if (headerCells[i].innerText.toLowerCase().includes('ipo date')) {
+      return i;
+    }
+  }
+  return -1;
+}
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
