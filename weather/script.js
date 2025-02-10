@@ -1,3 +1,127 @@
+app = Flask(__name__)
+sock = Sock(app)
+
+def read_csv_with_fallback(file_path):
+    """Read CSV with automatic encoding fallback."""
+    try:
+        return pd.read_csv(file_path, encoding='utf-8')
+    except UnicodeDecodeError:
+        return pd.read_csv(file_path, encoding='windows-1252')
+
+
+@app.route('/')
+def home():
+    return render_template('main.html')
+
+@app.route('/scripts')
+def scripts():
+    return render_template('scripts.html')
+
+@app.route('/data_pg')
+def data_pg():
+    return render_template('data_pg.html')
+
+@app.route('/get_csv')
+def get_csv():
+    file_type = request.args.get('file')
+
+    # Determine which file to fetch
+    file_path = 'ipoinput.csv' if file_type == 'input' else 'ipooutput.csv' if file_type == 'output' else None
+
+    if not file_path or not os.path.exists(file_path):
+        return "<p style='color:red;'>CSV file not found</p>", 404
+
+    try:
+        # Load the CSV file
+        df = pd.read_csv(file_path, encoding='windows-1252')
+
+        # Standardize and clean column names
+        df.columns = df.columns.str.strip()
+
+        # Ensure the 'IPO Date' column exists before sorting
+        if 'IPO Date' in df.columns:
+            # Parse dates in the 'IPO Date' column
+            df['IPO Date'] = pd.to_datetime(df['IPO Date'], format='%m/%d/%Y', errors='coerce')
+            
+            # Drop rows where 'IPO Date' couldn't be parsed
+            df = df.dropna(subset=['IPO Date'])
+            
+            # Sort by IPO Date in descending order
+            df = df.sort_values(by='IPO Date', ascending=False, inplace=True)
+
+        # Return the DataFrame as an HTML table
+        return df.to_html(classes='table table-striped', index=False)
+    
+    except Exception as e:
+        return f"<p style='color:red;'>Error reading CSV: {e}</p>", 500
+
+
+#csv_display {
+      display: none;
+      flex-grow: 1;
+      overflow: auto;
+      padding: 10px;
+      border: 1px solid #ddd;
+      background-color: #f9f9f9;
+      max-width: 100%;
+      height: calc(100% - 150px);
+  }
+
+  table {
+      width: 100%;
+      border-collapse: collapse;
+  }
+
+  th, td {
+      padding: 8px;
+      border: 1px solid #ddd;
+      text-align: left;
+  }
+
+  th {
+      background-color: #f2f2f2;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+  }
+
+  select {
+      margin-left: 10px;
+  }
+
+  th div:hover {
+      background-color: #e0e0e0;
+  }
+
+  #active_filters {
+      padding: 10px;
+      background-color: #f1f1f1;
+      display: flex;
+      flex-wrap: wrap;
+  }
+
+  #active_filters span {
+      margin: 5px;
+      background-color: #ddd;
+      padding: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+  }
+
+  .dropdown-option {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      padding: 2px;
+  }
+
+  .dropdown-option:hover {
+      background-color: #ddd;
+  }
+
+
+
+
 const options = {
     method: 'GET',
     headers: {
