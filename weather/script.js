@@ -44,54 +44,162 @@ submit.addEventListener("click", (e) => {
 
 fetchWeather('Delhi');
 
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Page</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='scripts.css') }}">  
+  
+  <style>
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
 
-sock = Sock(app)
+    th, td {
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
 
-def read_csv_with_fallback(file_path):
-    """Read CSV with automatic encoding fallback."""
-    try:
-        return pd.read_csv(file_path, encoding='utf-8')
-    except UnicodeDecodeError:
-        return pd.read_csv(file_path, encoding='windows-1252')
-
-
-@app.route('/')
-def home():
-    return render_template('main.html')
-
-@app.route('/data_pg')
-def data_pg():
-    return render_template('data_pg.html')
+    th {
+      background-color: #f4f4f4;
+      font-weight: bold;
+    }
 
 
+    
+  .csv_table_container {
+  height: 500px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  margin-top: 20px;
+}
+
+.total-records {
+  position: fixed;
+  bottom: 0px;
+  left: 10px; /* Aligns to the bottom-left */
+  padding: 10px;
+  font-weight: bold;
+  text-align: left;
+  z-index: 1000; /* Ensures it stays above other elements */
+}
+
+  </style>
+
+  <script>
+    let totalRecords = 0;
+    
+
+    function fetchCSV(fileType) {
+      // Fetch all data without pagination
+      fetch(`/get_csv?file=${fileType}`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.error) {
+            document.getElementById('csv_display').innerHTML = `<p style='color:red;'>${data.error}</p>`;
+          } else {
+            displayTable(data);
+          }
+        })
+        .catch(error => {
+          document.getElementById('csv_display').innerHTML = `<p style='color:red;'>Error: ${error.message}</p>`;
+        });
+    }
+
+let tableData = []; // Store full dataset
+let recordsPerLoad = 100; // Load 20 records at a time
+let currentLoaded = 0; // Tracks the number of records loaded
+
+function displayTable(data) {
+    if (!data.length) {
+        document.getElementById('csv_display').innerHTML = '<p>No data available.</p>';
+        return;
+    }
+
+    tableData = data; // Store data globally
+    currentLoaded = 0; // Reset load counter
+    document.getElementById('csv_display').innerHTML = ''; // Clear previous content
+
+    let table = document.createElement('table');
+    table.id = 'data_table';
+    table.classList.add('table', 'table-striped');
+
+    // Create table header
+    let header = `<thead><tr>${Object.keys(tableData[0]).map(key => `<th>${key}</th>`).join('')}</tr></thead>`;
+    table.innerHTML = header;
+
+    let tbody = document.createElement('tbody');
+    tbody.id = 'table_body';
+
+    table.appendChild(tbody);
+    document.getElementById('csv_display').appendChild(table);
+
+    loadMoreRecords(); // Load initial records
+
+    // Attach scroll event for infinite scrolling
+    document.getElementById('csv_display').addEventListener('scroll', handleScroll);
+
+    // Display the total number of records at the bottom
+    totalRecords = data.length;
+    document.getElementById('csv_display').innerHTML += `<div class="total-records">Total Records: ${totalRecords}</div>`;
+}
+
+function loadMoreRecords() {
+    let tbody = document.getElementById('table_body');
+
+    let end = Math.min(currentLoaded + recordsPerLoad, tableData.length);
+    let newRecords = tableData.slice(currentLoaded, end);
+
+    newRecords.forEach(row => {
+        let tr = document.createElement('tr');
+        Object.values(row).forEach(value => {
+            let td = document.createElement('td');
+            td.textContent = value !== null ? value : '';
+            tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+    });
+
+    currentLoaded = end; // Update records loaded count
+
+    // Remove event listener when all data is loaded
+    if (currentLoaded >= tableData.length) {
+        document.getElementById('csv_display').removeEventListener('scroll', handleScroll);
+    }
+
+}
+
+function handleScroll() {
+    let container = document.getElementById('csv_display');
+
+    if (container.scrollTop + container.clientHeight >= container.scrollHeight - 10) {
+        loadMoreRecords(); // Load more records when user reaches bottom
+    }
+}
 
 
-@app.route('/get_csv')
-def get_csv():
-    file_type = request.args.get('file')
+  </script>
+</head>
 
-    file_path = 'ipoinput.csv' if file_type == 'input' else 'ipooutput.csv' if file_type == 'output' else None
+<body>
+  <div class="header">TERMINAL APP</div>
 
-    if not file_path or not os.path.exists(file_path):
-        return {"error": "CSV file not found"}, 404
-
-    try:
-        df = read_csv_with_fallback(file_path)
-
-        # Normalize column names to lowercase for consistency
-        df.columns = df.columns.str.strip().str.lower()
-
-        # Ensure IPO date column is present and handle sorting
-        if 'ipo date' in df.columns:
-            df['ipo date'] = pd.to_datetime(df['ipo date'], errors='coerce')
-            df = df.dropna(subset=['ipo date'])  # Remove rows with invalid dates
-            df = df.sort_values(by='ipo date', ascending=False)
-            df['ipo date'] = df['ipo date'].dt.strftime('%m/%d/%Y')
-
-       
-        # Return the entire dataframe as JSON
-        return df.to_json(orient='records')
-
-    except Exception as e:
-        return {"error": f"Error reading CSV: {e}"}, 500
-
+  <div class="initial_container">
+    <button onclick="fetchCSV('input')" class="initial_button">Input File</button>
+    <button onclick="fetchCSV('output')" class="initial_button">Output File</button>
+  </div>
+  
+  <div id="csv_display" class="csv_table_container">
+    <!-- Table content will be inserted here -->
+  </div>  
+  
+  
+  <div id="total_records" class="total-records">
+    <!-- Total records will be displayed here -->
+  </div>
+</body>
+</html>
