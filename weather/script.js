@@ -1,3 +1,69 @@
+ table {
+      width: 100%;
+      border-collapse: collapse;
+      background-color: pink;
+    }
+
+    th, td {
+      padding: 10px;
+      border: 1px solid #ddd;
+      text-align: left;
+    }
+
+    th {
+      background-color: #f4f4f4;
+      font-weight: bold;
+    }
+
+
+    body {
+  margin: 0;
+  padding: 0;
+  font-family: Arial, sans-serif;
+}
+
+.header {
+  text-align: center;
+  background-color: #333;
+  color: white;
+  padding: 15px;
+}
+
+.initial_container {
+  text-align: center;
+  margin-top: 20px;
+}
+
+.initial_button {
+  margin: 10px;
+  padding: 10px 20px;
+  background-color: #4CAF50;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+.initial_button:hover {
+  background-color: #45a049;
+}
+
+.csv_table_container {
+  height: 500px;
+  overflow-y: auto;
+  border: 1px solid #ddd;
+  margin-top: 20px;
+  padding-bottom: 40px;  /* Account for the fixed bottom element */
+}
+
+.total-records {
+  position: fixed;
+  bottom: 0px;
+  left: 10px; /* Aligns to the bottom-left */
+  padding: 10px;
+  font-weight: bold;
+  z-index: 1000; /* Ensures it stays above other elements */
+}
+
 const options = {
     method: 'GET',
     headers: {
