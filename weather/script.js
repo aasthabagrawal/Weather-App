@@ -1,4 +1,43 @@
- table {
+app.route('/get_csv')
+def get_csv():
+    file_type = request.args.get('file')
+
+    # Determine which file to fetch
+    file_path = 'ipoinput.csv' if file_type == 'input' else 'ipooutput.csv' if file_type == 'output' else None
+
+    if not file_path or not os.path.exists(file_path):
+        return "<p style='color:red;'>CSV file not found</p>", 404
+
+    try:
+        # Load the CSV file
+        df = pd.read_csv(file_path, encoding='windows-1252')
+
+        # Standardize and clean column names
+        df.columns = df.columns.str.strip().str.lower()
+
+        # Ensure the 'IPO Date' column exists before sorting
+        if 'ipo date' in df.columns:
+            # Parse dates in the 'IPO Date' column
+            df['ipo date'] = pd.to_datetime(df['ipo date'], format='%m/%d/%Y', errors='coerce')
+
+            # Drop rows where 'IPO Date' couldn't be parsed
+            df = df.dropna(subset=['ipo date'])       
+
+            # Sort by IPO Date in descending order
+            df = df.sort_values(by='ipo date', ascending=False)
+
+            # Convert back to MM/DD/YYYY before returning
+            df['ipo date'] = df['ipo date'].dt.strftime('%m/%d/%Y')
+
+        # Return the DataFrame as an HTML table
+        return df.to_html(classes='table table-striped', index=False)
+    
+    except Exception as e:
+        return f"<p style='color:red;'>Error reading CSV: {e}</p>", 500
+
+
+
+table {
       width: 100%;
       border-collapse: collapse;
       background-color: pink;
