@@ -85,3 +85,493 @@
     </main>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+@app.route('/get_csv')
+def get_csv():
+    file_type = request.args.get('file')
+
+    # Determine which file to fetch
+    file_path = 'ipoinput.csv' if file_type == 'input' else 'ipooutput.csv' if file_type == 'output' else None
+
+    if not file_path or not os.path.exists(file_path):
+        return "<p style='color:red;'>CSV file not found</p>", 404
+
+    try:
+        # Load the CSV file
+        df = pd.read_csv(file_path, encoding='windows-1252')
+
+        # Standardize and clean column names
+        df.columns = df.columns.str.strip().str.lower()
+
+        # Ensure the 'IPO Date' column exists before sorting
+        if 'ipo date' in df.columns:
+            # Parse dates in the 'IPO Date' column
+            df['ipo date'] = pd.to_datetime(df['ipo date'], format='%m/%d/%Y', errors='coerce')
+
+            # Drop rows where 'IPO Date' couldn't be parsed
+            df = df.dropna(subset=['ipo date'])       
+
+            # Sort by IPO Date in descending order
+            df = df.sort_values(by='ipo date', ascending=False)
+
+            # Convert back to MM/DD/YYYY before returning
+            df['ipo date'] = df['ipo date'].dt.strftime('%m/%d/%Y')
+
+        # Return the DataFrame as an HTML table
+        return df.to_html(classes='table table-striped', index=False)
+    
+    except Exception as e:
+        return f"<p style='color:red;'>Error reading CSV: {e}</p>", 500
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Data Page</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='scripts.css') }}">
+
+
+  <script>
+    let currentFile = "";
+    let activeSymbolFilters = new Set();
+    let activeDateFilters = new Set();
+    let symbolColumnIndex = -1;
+    let dateColumnIndex = -1;
+
+    function fetchCSV(type) {
+      resetFilters();
+      currentFile = type;
+      updateTable();
+    }
+
+    function updateTable() {
+      if (!currentFile) return;
+
+      fetch(`/get_csv?file=${currentFile}`)
+        .then(response => response.text())
+        .then(data => {
+          let displayDiv = document.getElementById('csv_display');
+          displayDiv.innerHTML = data;
+          displayDiv.style.display = "block";
+          if (currentFile === 'output') {
+            addSymbolFilter();
+            addDateFilter();
+          }
+        })
+        .catch(error => {
+          document.getElementById('csv_display').innerHTML = `<p style="color:red;">Error loading data: ${error}</p>`;
+        });
+    }
+
+    function resetFilters() {
+  // Clear all active filters
+  activeDateFilters.clear();
+  activeSymbolFilters.clear();
+
+  // Reset all checkboxes in the filter dropdown
+  const checkboxes = document.querySelectorAll('.checkbox-label input[type="checkbox"]');
+  checkboxes.forEach(checkbox => {
+    checkbox.checked = false;
+  });
+
+  // Reset the table to show all rows
+  const tableRows = document.querySelectorAll('#csv_display table tbody tr');
+  tableRows.forEach(row => {
+    row.style.display = '';
+  });
+}
+
+
+function addSymbolFilter() {
+  const table = document.querySelector('#csv_display table');
+  if (!table) return;
+
+  symbolColumnIndex = Array.from(table.querySelectorAll('th')).findIndex(
+    th => th.textContent.trim().toLowerCase() === 'ipo symbol'
+  );
+  if (symbolColumnIndex === -1) return;
+
+  const filterButton = createFilterButton();
+  const dropdownContainer = createDropdownContainer();
+  const searchInput = createSearchInput();
+
+  dropdownContainer.appendChild(searchInput);
+
+  const uniqueSymbols = new Set();
+  Array.from(table.querySelectorAll('tbody tr')).forEach(row => {
+    const symbolCell = row.cells[symbolColumnIndex];
+    if (symbolCell) uniqueSymbols.add(symbolCell.textContent.trim());
+  });
+
+  uniqueSymbols.forEach(symbol => {
+    const option = createCheckboxOption(symbol, () => toggleSymbolFilter(symbol));
+    dropdownContainer.appendChild(option);
+  });
+
+  attachDropdownToHeader(table, symbolColumnIndex, filterButton, dropdownContainer);
+  filterCheckboxOptionsBySearch(searchInput, dropdownContainer);
+}
+
+  function addDateFilter() {
+  const table = document.querySelector('#csv_display table');
+  if (!table) return;
+
+  dateColumnIndex = Array.from(table.querySelectorAll('th')).findIndex(
+    (th) => th.textContent.trim().toLowerCase() === 'ipo date'
+  );
+  if (dateColumnIndex === -1) return;
+
+  const filterButton = createFilterButton();
+  const dropdownContainer = createDropdownContainer();
+
+
+  const yearMonthMap = new Map();
+
+  Array.from(table.querySelectorAll('tbody tr')).forEach((row) => {
+    const cell = row.cells[dateColumnIndex];
+    if (cell) {
+      const dateParts = cell.textContent.trim().split('/');
+      if (dateParts.length === 3) {
+        const [month, , year] = dateParts;
+        const monthName = getMonthName(parseInt(month));
+        if (!yearMonthMap.has(year)) yearMonthMap.set(year, new Set());
+        yearMonthMap.get(year).add(monthName);
+      }
+    }
+  });
+
+  const treeView = createTreeView(yearMonthMap);
+  dropdownContainer.appendChild(createTreeView(yearMonthMap,dropdownContainer));
+
+  attachDropdownToHeader(table, dateColumnIndex, filterButton, dropdownContainer);
+}
+
+
+
+function createTreeView(yearMonthMap) {
+  const treeView = document.createElement('ul');
+  treeView.className = 'tree-view';
+
+  // Sort years in descending order (newest first)
+  const sortedYears = Array.from(yearMonthMap.keys()).sort((a, b) => b - a);
+  
+  sortedYears.forEach((year) => {
+    const yearNode = createTreeNode(year, yearMonthMap);
+    treeView.appendChild(yearNode);
+  });
+  return treeView;
+}
+
+
+function createTreeNode(year, yearMonthMap) {
+  const li = document.createElement("li");
+  li.className = "year-node";
+  li.innerHTML = `
+    <label class="checkbox-label">
+      <input type="checkbox" class="year-checkbox" data-year="${year}">
+      ${year}
+    </label>
+    <ul class="month-list" style="display: none;"></ul>
+  `;
+
+  const monthList = li.querySelector(".month-list");
+  const yearCheckbox = li.querySelector(".year-checkbox");
+  const label = li.querySelector("label");
+
+  // Toggle expand/collapse when clicking the year label (but not the checkbox)
+  label.addEventListener("click", (event) => {
+    if (event.target.tagName === "INPUT") return; // Don't handle checkbox clicks
+    
+    // Toggle expanded state
+    const isExpanded = monthList.style.display === "block";
+    monthList.style.display = isExpanded ? "none" : "block";
+    
+    // Populate months if not already done
+    if (!isExpanded && monthList.children.length === 0) {
+      populateMonthList(year, yearMonthMap, monthList, yearCheckbox);
+    }
+  });
+
+  // Handle year checkbox changes
+  yearCheckbox.addEventListener("change", () => {
+    const isChecked = yearCheckbox.checked;
+    
+    // Expand the list if it's not already expanded
+    if (monthList.style.display !== "block") {
+      monthList.style.display = "block";
+      if (monthList.children.length === 0) {
+        populateMonthList(year, yearMonthMap, monthList, yearCheckbox);
+      }
+    }
+    
+    // Update all month checkboxes
+    const monthCheckboxes = monthList.querySelectorAll("input[type='checkbox']");
+    monthCheckboxes.forEach((checkbox) => {
+      checkbox.checked = isChecked;
+      const monthName = checkbox.value;
+      toggleDateFilter(year, monthName, isChecked);
+    });
+  });
+
+  return li;
+}
+
+// Function to populate months under a year
+function populateMonthList(year, yearMonthMap, monthList, yearCheckbox) {
+  // Get months for this year and sort them
+  const monthNames = ["January", "February", "March", "April", "May", "June", 
+                      "July", "August", "September", "October", "November", "December"];
+  const months = Array.from(yearMonthMap.get(year) || []);
+  months.sort((a, b) => monthNames.indexOf(a) - monthNames.indexOf(b));
+  
+  // Create month checkboxes
+  months.forEach((monthName) => {
+    const monthItem = document.createElement("li");
+    monthItem.innerHTML = `
+      <label class="checkbox-label">
+        <input type="checkbox" class="month-checkbox" data-year="${year}" value="${monthName}">
+        ${monthName}
+      </label>
+    `;
+
+    const monthCheckbox = monthItem.querySelector(".month-checkbox");
+    
+    // Handle month checkbox changes
+    monthCheckbox.addEventListener("change", (event) => {
+      const isChecked = event.target.checked;
+      toggleDateFilter(year, monthName, isChecked);
+      
+      // Update year checkbox state
+      updateYearCheckboxState(monthList, yearCheckbox);
+    });
+
+    monthList.appendChild(monthItem);
+  });
+}
+
+function updateYearCheckboxState(monthList, yearCheckbox) {
+  const monthCheckboxes = monthList.querySelectorAll(".month-checkbox");
+  const allChecked = Array.from(monthCheckboxes).every((cb) => cb.checked);
+  const anyChecked = Array.from(monthCheckboxes).some((cb) => cb.checked);
+  
+  yearCheckbox.checked = allChecked;
+  yearCheckbox.indeterminate = anyChecked && !allChecked;
+}
+
+
+
+function toggleSymbolFilter(selectedValue) {
+  if (activeSymbolFilters.has(selectedValue)) {
+    activeSymbolFilters.delete(selectedValue);
+  } else {
+    activeSymbolFilters.add(selectedValue);
+  }
+  filterTable();
+}
+
+function toggleDateFilter(year, monthName, isChecked) {
+  const filterKey = `${year}/${monthName}`;
+  
+  if (isChecked) {
+    activeDateFilters.add(filterKey);
+  } else {
+    activeDateFilters.delete(filterKey);
+  }
+  
+  console.log("Date filters updated:", Array.from(activeDateFilters));
+  filterTable();
+}
+
+function filterTable() {
+  const table = document.querySelector('#csv_display table');
+  if (!table) return;
+  
+  Array.from(table.querySelectorAll('tbody tr')).forEach((row) => {
+    const symbolCell = row.cells[symbolColumnIndex];
+    const dateCell = row.cells[dateColumnIndex];
+    
+    // Skip invalid rows
+    if (!symbolCell || !dateCell) {
+      row.style.display = 'none';
+      return;
+    }
+    
+    // Process date value
+    const dateParts = dateCell.textContent.trim().split('/');
+    let matchesDateFilter = true;
+    
+    if (activeDateFilters.size > 0 && dateParts.length === 3) {
+      const [month, , year] = dateParts;
+      const monthName = getMonthName(parseInt(month));
+      const dateKey = `${year}/${monthName}`;
+      matchesDateFilter = activeDateFilters.has(dateKey);
+    }
+    
+    // Process symbol value
+    let matchesSymbolFilter = true;
+    const symbolValue = symbolCell.textContent.trim();
+    
+    if (activeSymbolFilters.size > 0) {
+      matchesSymbolFilter = activeSymbolFilters.has(symbolValue);
+    }
+    
+    // Show/hide row based on filter matches
+    row.style.display = (matchesDateFilter && matchesSymbolFilter) ? '' : 'none';
+  });
+  
+  console.log(`Filtered table: ${activeDateFilters.size} date filters, ${activeSymbolFilters.size} symbol filters`);
+}
+
+function getMonthName(monthNumber) {
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 
+    'June', 'July', 'August', 'September', 'October', 
+    'November', 'December'
+  ];
+  return monthNames[monthNumber - 1]; // Subtract 1 since monthNumber is 1-based
+}
+
+
+    function createSearchInput() {
+      const searchInput = document.createElement('input');
+      searchInput.type = 'text';
+      searchInput.placeholder = 'Search...';
+      searchInput.style.width = '100%';
+      searchInput.style.marginBottom = '5px';
+      searchInput.oninput = (event) => filterCheckboxOptionsBySearch(event.target, searchInput.parentNode);
+      return searchInput;
+    }
+
+    function filterCheckboxOptionsBySearch(searchInput, dropdownContainer) {
+      const filterValue = searchInput.value.toLowerCase();
+      const options = dropdownContainer.querySelectorAll('.dropdown-option');
+      options.forEach(option => {
+        const textValue = option.textContent.toLowerCase();
+        option.style.display = textValue.includes(filterValue) ? '' : 'none';
+      });
+    }
+
+    function createCheckboxOption(text, clickHandler) {
+      const container = document.createElement('div');
+      container.className = 'dropdown-option';
+      container.onclick = () => {
+        checkbox.checked = !checkbox.checked;
+        clickHandler();
+      };
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.style.marginRight = '5px';
+      checkbox.onclick = (event) => {
+        event.stopPropagation();
+        clickHandler();
+      };
+
+      const label = document.createElement('span');
+      label.textContent = text;
+      container.appendChild(checkbox);
+      container.appendChild(label);
+      return container;
+    }
+
+    function createFilterButton() {
+      const filterButton = document.createElement('button');
+      filterButton.textContent = '▼';
+      filterButton.style.marginLeft = '5px';
+      filterButton.style.cursor = 'pointer';
+      filterButton.style.border = 'none';
+      filterButton.style.background = 'transparent';
+      return filterButton;
+    }
+
+    function createDropdownContainer() {
+      const dropdownContainer = document.createElement('div');
+      dropdownContainer.style.position = 'absolute';
+      dropdownContainer.style.zIndex = '10';
+      dropdownContainer.style.background = '#fff';
+      dropdownContainer.style.border = '1px solid #ddd';
+      dropdownContainer.style.display = 'none';
+      dropdownContainer.style.maxHeight = '200px';
+      dropdownContainer.style.overflowY = 'auto';
+      dropdownContainer.style.padding = '5px';
+      dropdownContainer.onclick = (event) => event.stopPropagation();
+      return dropdownContainer;
+    }
+
+let currentOpenDropdown = null;
+
+function attachDropdownToHeader(table, columnIndex, filterButton, dropdownContainer) {
+  const headerCell = table.querySelectorAll('th')[columnIndex];
+
+  headerCell.appendChild(filterButton);
+  headerCell.appendChild(dropdownContainer);
+
+  dropdownContainer.style.display = 'none'; // Hide by default
+
+  filterButton.addEventListener('click', (event) => {
+    event.stopPropagation();
+
+    // Close any previously open dropdown
+    if (currentOpenDropdown && currentOpenDropdown !== dropdownContainer) {
+      currentOpenDropdown.style.display = 'none';
+    }
+
+    // Toggle current dropdown visibility
+    const isDropdownVisible = dropdownContainer.style.display === 'block';
+    dropdownContainer.style.display = isDropdownVisible ? 'none' : 'block';
+    currentOpenDropdown = dropdownContainer.style.display === 'block' ? dropdownContainer : null;
+  });
+
+  document.addEventListener('click', (event) => {
+  // Ensure the click is outside the dropdown and not on checkboxes or labels
+  if (
+    currentOpenDropdown &&
+    !dropdownContainer.contains(event.target) &&
+    !event.target.closest('.checkbox-label')
+  ) {
+    currentOpenDropdown.style.display = 'none';
+    currentOpenDropdown = null;
+  }
+});
+
+  // Prevent dropdown closure when interacting inside it
+  dropdownContainer.addEventListener('click', (event) => event.stopPropagation());
+}
+
+
+
+  </script>
+</head>
+
+<body>
+  <div class="header">TERMINAL APP</div>
+
+  <div class="initial_container">
+    <button onclick="fetchCSV('input')" class="initial_button">Input File</button>
+    <button onclick="fetchCSV('output')" class="initial_button">Output File</button>
+  </div>
+
+  <div id="active_filters"></div>
+
+  <div id="csv_display" class="csv_table_container">
+    <!-- Table will only appear after clicking a button -->
+  </div>
+</body>
+</html>
+
+
+
+
+
+
