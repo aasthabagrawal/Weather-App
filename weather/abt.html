@@ -235,7 +235,9 @@ def get_csv():
 
 
 
-<!DOCTYPE html>
+
+ 
+  <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -325,7 +327,17 @@ function addSymbolFilter() {
   filterCheckboxOptionsBySearch(searchInput, dropdownContainer);
 }
 
-  function addDateFilter() {
+
+function toggleSymbolFilter(selectedValue) {
+  if (activeSymbolFilters.has(selectedValue)) {
+    activeSymbolFilters.delete(selectedValue);
+  } else {
+    activeSymbolFilters.add(selectedValue);
+  }
+  filterTable();
+}
+
+function addDateFilter() {
   const table = document.querySelector('#csv_display table');
   if (!table) return;
 
@@ -337,9 +349,8 @@ function addSymbolFilter() {
   const filterButton = createFilterButton();
   const dropdownContainer = createDropdownContainer();
 
-
+  // Collect all unique year/month combinations
   const yearMonthMap = new Map();
-
   Array.from(table.querySelectorAll('tbody tr')).forEach((row) => {
     const cell = row.cells[dateColumnIndex];
     if (cell) {
@@ -353,13 +364,13 @@ function addSymbolFilter() {
     }
   });
 
+  // Create and add tree view to dropdown container
   const treeView = createTreeView(yearMonthMap);
-  dropdownContainer.appendChild(createTreeView(yearMonthMap,dropdownContainer));
+  dropdownContainer.appendChild(treeView);
 
+  // Attach dropdown to table header
   attachDropdownToHeader(table, dateColumnIndex, filterButton, dropdownContainer);
 }
-
-
 
 function createTreeView(yearMonthMap) {
   const treeView = document.createElement('ul');
@@ -372,92 +383,154 @@ function createTreeView(yearMonthMap) {
     const yearNode = createTreeNode(year, yearMonthMap);
     treeView.appendChild(yearNode);
   });
+
   return treeView;
 }
-
 
 function createTreeNode(year, yearMonthMap) {
   const li = document.createElement("li");
   li.className = "year-node";
-  li.innerHTML = `
-    <label class="checkbox-label">
-      <input type="checkbox" class="year-checkbox" data-year="${year}">
-      ${year}
-    </label>
-    <ul class="month-list" style="display: none;"></ul>
-  `;
-
-  const monthList = li.querySelector(".month-list");
-  const yearCheckbox = li.querySelector(".year-checkbox");
-  const label = li.querySelector("label");
-
-  // Toggle expand/collapse when clicking the year label (but not the checkbox)
-  label.addEventListener("click", (event) => {
-    if (event.target.tagName === "INPUT") return; // Don't handle checkbox clicks
-    
-    // Toggle expanded state
-    const isExpanded = monthList.style.display === "block";
-    monthList.style.display = isExpanded ? "none" : "block";
-    
-    // Populate months if not already done
-    if (!isExpanded && monthList.children.length === 0) {
-      populateMonthList(year, yearMonthMap, monthList, yearCheckbox);
-    }
-  });
-
-  // Handle year checkbox changes
+  
+  const yearRowContainer = document.createElement("div");
+  yearRowContainer.className = "year-row-container";
+  yearRowContainer.style.display = "flex";
+  yearRowContainer.style.alignItems = "center";
+  
+  const yearCheckbox = document.createElement("input");
+  yearCheckbox.type = "checkbox";
+  yearCheckbox.className = "year-checkbox";
+  yearCheckbox.dataset.year = year;
+  
+  const expandButton = document.createElement("button");
+  expandButton.type = "button";
+  expandButton.className = "expand-button";
+  expandButton.innerHTML = "+";
+  expandButton.style.marginLeft = "5px";
+  expandButton.style.marginRight = "5px";
+  expandButton.style.cursor = "pointer";
+  expandButton.style.width = "20px";
+  expandButton.style.height = "20px";
+  expandButton.style.padding = "0";
+  expandButton.style.lineHeight = "1";
+  expandButton.style.textAlign = "center";
+  expandButton.style.border = "1px solid #ccc";
+  expandButton.style.borderRadius = "3px";
+  expandButton.style.background = "#f5f5f5";
+  
+  const yearLabel = document.createElement("label");
+  yearLabel.textContent = year;
+  yearLabel.style.cursor = "pointer";
+  
+  yearRowContainer.appendChild(yearCheckbox);
+  yearRowContainer.appendChild(expandButton);
+  yearRowContainer.appendChild(yearLabel);
+  
+  const monthList = document.createElement("ul");
+  monthList.className = "month-list";
+  monthList.style.display = "none";
+  monthList.style.paddingLeft = "25px";
+  monthList.style.marginTop = "5px";
+  
+  li.appendChild(yearRowContainer);
+  li.appendChild(monthList);
+  
+  // Store month checkboxes reference
+  let monthCheckboxes = [];
+  
   yearCheckbox.addEventListener("change", () => {
     const isChecked = yearCheckbox.checked;
     
-    // Expand the list if it's not already expanded
-    if (monthList.style.display !== "block") {
-      monthList.style.display = "block";
-      if (monthList.children.length === 0) {
+    // Get months for this year
+    const months = Array.from(yearMonthMap.get(year) || []);
+    
+    // Update filters for all months
+    months.forEach(monthName => {
+      toggleDateFilter(year, monthName, isChecked);
+    });
+    
+    // If month list is populated, update all month checkboxes
+    if (monthList.children.length > 0) {
+      monthCheckboxes.forEach(checkbox => {
+        checkbox.checked = isChecked;
+      });
+    } else {
+      // If month list isn't populated yet but expanded, populate it
+      if (monthList.style.display === "block") {
         populateMonthList(year, yearMonthMap, monthList, yearCheckbox);
       }
     }
-    
-    // Update all month checkboxes
-    const monthCheckboxes = monthList.querySelectorAll("input[type='checkbox']");
-    monthCheckboxes.forEach((checkbox) => {
-      checkbox.checked = isChecked;
-      const monthName = checkbox.value;
-      toggleDateFilter(year, monthName, isChecked);
-    });
   });
-
+  
+  expandButton.addEventListener("click", () => {
+    const isExpanded = monthList.style.display === "block";
+    monthList.style.display = isExpanded ? "none" : "block";
+    expandButton.innerHTML = isExpanded ? "+" : "-";
+    
+    // Populate month list if not already done and sync checkbox states
+    if (!isExpanded && monthList.children.length === 0) {
+      populateMonthList(year, yearMonthMap, monthList, yearCheckbox);
+      
+      // Get the newly created month checkboxes and sync their states
+      monthCheckboxes = Array.from(monthList.querySelectorAll('.month-checkbox'));
+      if (yearCheckbox.checked) {
+        monthCheckboxes.forEach(checkbox => {
+          checkbox.checked = true;
+        });
+      }
+    }
+  });
+  
+  yearLabel.addEventListener("click", () => {
+    expandButton.click();
+  });
+  
   return li;
 }
 
-// Function to populate months under a year
 function populateMonthList(year, yearMonthMap, monthList, yearCheckbox) {
-  // Get months for this year and sort them
   const monthNames = ["January", "February", "March", "April", "May", "June", 
                       "July", "August", "September", "October", "November", "December"];
   const months = Array.from(yearMonthMap.get(year) || []);
   months.sort((a, b) => monthNames.indexOf(a) - monthNames.indexOf(b));
   
-  // Create month checkboxes
   months.forEach((monthName) => {
     const monthItem = document.createElement("li");
-    monthItem.innerHTML = `
-      <label class="checkbox-label">
-        <input type="checkbox" class="month-checkbox" data-year="${year}" value="${monthName}">
-        ${monthName}
-      </label>
-    `;
-
-    const monthCheckbox = monthItem.querySelector(".month-checkbox");
+    monthItem.style.marginBottom = "3px";
     
-    // Handle month checkbox changes
+    const monthContainer = document.createElement("div");
+    monthContainer.style.display = "flex";
+    monthContainer.style.alignItems = "center";
+    
+    const monthCheckbox = document.createElement("input");
+    monthCheckbox.type = "checkbox";
+    monthCheckbox.className = "month-checkbox";
+    monthCheckbox.dataset.year = year;
+    monthCheckbox.value = monthName;
+    
+    // Set initial state based on whether this month is in activeDateFilters
+    const filterKey = `${year}/${monthName}`;
+    monthCheckbox.checked = activeDateFilters.has(filterKey);
+    
+    const monthLabel = document.createElement("label");
+    monthLabel.textContent = monthName;
+    monthLabel.style.marginLeft = "5px";
+    monthLabel.style.cursor = "pointer";
+    
+    monthContainer.appendChild(monthCheckbox);
+    monthContainer.appendChild(monthLabel);
+    monthItem.appendChild(monthContainer);
+    
     monthCheckbox.addEventListener("change", (event) => {
       const isChecked = event.target.checked;
       toggleDateFilter(year, monthName, isChecked);
-      
-      // Update year checkbox state
       updateYearCheckboxState(monthList, yearCheckbox);
     });
-
+    
+    monthLabel.addEventListener("click", () => {
+      monthCheckbox.checked = !monthCheckbox.checked;
+      monthCheckbox.dispatchEvent(new Event("change"));
+    });
+    
     monthList.appendChild(monthItem);
   });
 }
@@ -469,17 +542,6 @@ function updateYearCheckboxState(monthList, yearCheckbox) {
   
   yearCheckbox.checked = allChecked;
   yearCheckbox.indeterminate = anyChecked && !allChecked;
-}
-
-
-
-function toggleSymbolFilter(selectedValue) {
-  if (activeSymbolFilters.has(selectedValue)) {
-    activeSymbolFilters.delete(selectedValue);
-  } else {
-    activeSymbolFilters.add(selectedValue);
-  }
-  filterTable();
 }
 
 function toggleDateFilter(year, monthName, isChecked) {
@@ -495,6 +557,7 @@ function toggleDateFilter(year, monthName, isChecked) {
   filterTable();
 }
 
+// Filtering function remains the same
 function filterTable() {
   const table = document.querySelector('#csv_display table');
   if (!table) return;
@@ -532,7 +595,10 @@ function filterTable() {
     row.style.display = (matchesDateFilter && matchesSymbolFilter) ? '' : 'none';
   });
   
-  console.log(`Filtered table: ${activeDateFilters.size} date filters, ${activeSymbolFilters.size} symbol filters`);
+  // Update record counter if you have one
+  if (typeof updateRecordCounter === 'function') {
+    updateRecordCounter();
+  }
 }
 
 function getMonthName(monthNumber) {
@@ -671,9 +737,3 @@ function attachDropdownToHeader(table, columnIndex, filterButton, dropdownContai
   </div>
 </body>
 </html>
-
-
-
-
-
-
