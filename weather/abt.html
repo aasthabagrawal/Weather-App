@@ -1,3 +1,105 @@
+#csv_display {
+      display: none;
+      flex-grow: 1;
+      overflow: auto;
+      padding: 0px;
+      border: 1px solid #ddd;
+      background-color: #f9f9f9;
+      max-width: 100%;
+      height: calc(100% - 150px);
+  }
+
+  table {
+      width: 100%;
+      border-collapse: collapse;
+      border-spacing: 0;
+      border: 1px solid #ddd;
+  }
+
+  th, td {
+      padding: 5px;
+      border: 1px solid #ddd;
+      text-align: left;
+  }
+
+  th {
+      background-color: #f2f2f2;
+      position: sticky;
+      top: 0;
+      z-index: 1;
+      border-bottom: 1px solid #ddd;
+  }
+
+  select {
+      margin-left: 10px;
+  }
+
+  th div:hover {
+      background-color: #e0e0e0;
+  }
+
+  #active_filters {
+      padding: 10px;
+      background-color: #f1f1f1;
+      display: flex;
+      flex-wrap: wrap;
+  }
+
+  #active_filters span {
+      margin: 5px;
+      background-color: #ddd;
+      padding: 5px;
+      border-radius: 5px;
+      cursor: pointer;
+  }
+
+  .dropdown-option {
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      padding: 2px;
+  }
+
+  .dropdown-option:hover {
+      background-color: #ddd;
+  }
+
+  ul.tree-view {
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  ul.tree-view li {
+    margin-left: 20px;
+    position: relative;
+  }
+
+  ul.tree-view li label {
+    cursor: pointer;
+  }
+
+  ul.tree-view li ul {
+    display: none;
+    list-style: none;
+    padding-left: 15px;
+  }
+
+  ul.tree-view li.expanded > ul {
+    display: block;
+  }
+
+  .checkbox-label {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .checkbox-label input[type="checkbox"] {
+    margin-right: 5px;
+  }
+
+
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
