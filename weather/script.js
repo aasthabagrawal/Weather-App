@@ -1,39 +1,105 @@
-app.route('/get_csv')
-def get_csv():
-    file_type = request.args.get('file')
+// First, modify the addSymbolFilter function to add an ID to the dropdown container
+function addSymbolFilter() {
+  const table = document.querySelector('#csv_display table');
+  if (!table) return;
 
-    # Determine which file to fetch
-    file_path = 'ipoinput.csv' if file_type == 'input' else 'ipooutput.csv' if file_type == 'output' else None
+  symbolColumnIndex = Array.from(table.querySelectorAll('th')).findIndex(
+    th => th.textContent.trim().toLowerCase() === 'ipo symbol'
+  );
+  if (symbolColumnIndex === -1) return;
 
-    if not file_path or not os.path.exists(file_path):
-        return "<p style='color:red;'>CSV file not found</p>", 404
+  const filterButton = createFilterButton();
+  const dropdownContainer = createDropdownContainer();
+  dropdownContainer.id = 'symbol-dropdown-container'; // Add this line
 
-    try:
-        # Load the CSV file
-        df = pd.read_csv(file_path, encoding='windows-1252')
+  const searchInput = createSearchInput();
+  dropdownContainer.appendChild(searchInput);
 
-        # Standardize and clean column names
-        df.columns = df.columns.str.strip().str.lower()
+  const uniqueSymbols = new Set();
+  Array.from(table.querySelectorAll('tbody tr')).forEach(row => {
+    const symbolCell = row.cells[symbolColumnIndex];
+    if (symbolCell) uniqueSymbols.add(symbolCell.textContent.trim());
+  });
 
-        # Ensure the 'IPO Date' column exists before sorting
-        if 'ipo date' in df.columns:
-            # Parse dates in the 'IPO Date' column
-            df['ipo date'] = pd.to_datetime(df['ipo date'], format='%m/%d/%Y', errors='coerce')
+  uniqueSymbols.forEach(symbol => {
+    const option = createCheckboxOption(symbol, () => {
+      toggleSymbolFilter(symbol);
+      moveCheckedSymbolsToTop(); // Add this line
+    });
+    dropdownContainer.appendChild(option);
+  });
 
-            # Drop rows where 'IPO Date' couldn't be parsed
-            df = df.dropna(subset=['ipo date'])       
+  attachDropdownToHeader(table, symbolColumnIndex, filterButton, dropdownContainer);
+  filterCheckboxOptionsBySearch(searchInput, dropdownContainer);
+}
 
-            # Sort by IPO Date in descending order
-            df = df.sort_values(by='ipo date', ascending=False)
+// Add the function to move checked symbols to top
+function moveCheckedSymbolsToTop() {
+  const container = document.getElementById('symbol-dropdown-container');
+  if (!container) return;
 
-            # Convert back to MM/DD/YYYY before returning
-            df['ipo date'] = df['ipo date'].dt.strftime('%m/%d/%Y')
+  // Skip the search input which is the first child
+  const searchInput = container.firstChild;
+  
+  // Get all checkbox options except the search input
+  const options = Array.from(container.children).slice(1);
+  
+  // Separate into checked and unchecked arrays
+  const checked = [];
+  const unchecked = [];
+  
+  options.forEach(option => {
+    const checkbox = option.querySelector('input[type="checkbox"]');
+    if (checkbox && checkbox.checked) {
+      checked.push(option);
+    } else {
+      unchecked.push(option);
+    }
+  });
 
-        # Return the DataFrame as an HTML table
-        return df.to_html(classes='table table-striped', index=False)
-    
-    except Exception as e:
-        return f"<p style='color:red;'>Error reading CSV: {e}</p>", 500
+  // Clear the container (except search input)
+  while (container.children.length > 1) {
+    container.removeChild(container.lastChild);
+  }
+
+  // Add back in the desired order
+  checked.forEach(option => container.appendChild(option));
+  unchecked.forEach(option => container.appendChild(option));
+}
+
+// Modify the createCheckboxOption function to add a class for easier selection
+function createCheckboxOption(text, clickHandler) {
+  const container = document.createElement('div');
+  container.className = 'dropdown-option';
+  
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.style.marginRight = '5px';
+  
+  const label = document.createElement('span');
+  label.textContent = text;
+  
+  container.onclick = (event) => {
+    // Only toggle if clicking the container or label (not the checkbox directly)
+    if (event.target !== checkbox) {
+      checkbox.checked = !checkbox.checked;
+      clickHandler();
+    }
+  };
+  
+  checkbox.onclick = (event) => {
+    event.stopPropagation();
+    clickHandler();
+  };
+  
+  container.appendChild(checkbox);
+  container.appendChild(label);
+  return container;
+}
+
+
+
+
 
 
 
