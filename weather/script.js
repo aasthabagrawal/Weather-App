@@ -1,101 +1,98 @@
-// First, modify the addSymbolFilter function to add an ID to the dropdown container
-function addSymbolFilter() {
-  const table = document.querySelector('#csv_display table');
-  if (!table) return;
 
-  symbolColumnIndex = Array.from(table.querySelectorAll('th')).findIndex(
-    th => th.textContent.trim().toLowerCase() === 'ipo symbol'
-  );
-  if (symbolColumnIndex === -1) return;
+let socket; // Declare the socket outside for reuse
+let inputBuffer = ""; // Buffer for user input
+let inputHandler; // Reference for the terminal's input handler
+let inputHandlerDisposable;
 
-  const filterButton = createFilterButton();
-  const dropdownContainer = createDropdownContainer();
-  dropdownContainer.id = 'symbol-dropdown-container'; // Add this line
-
-  const searchInput = createSearchInput();
-  dropdownContainer.appendChild(searchInput);
-
-  const uniqueSymbols = new Set();
-  Array.from(table.querySelectorAll('tbody tr')).forEach(row => {
-    const symbolCell = row.cells[symbolColumnIndex];
-    if (symbolCell) uniqueSymbols.add(symbolCell.textContent.trim());
-  });
-
-  uniqueSymbols.forEach(symbol => {
-    const option = createCheckboxOption(symbol, () => {
-      toggleSymbolFilter(symbol);
-      moveCheckedSymbolsToTop(); // Add this line
-    });
-    dropdownContainer.appendChild(option);
-  });
-
-  attachDropdownToHeader(table, symbolColumnIndex, filterButton, dropdownContainer);
-  filterCheckboxOptionsBySearch(searchInput, dropdownContainer);
-}
-
-// Add the function to move checked symbols to top
-function moveCheckedSymbolsToTop() {
-  const container = document.getElementById('symbol-dropdown-container');
-  if (!container) return;
-
-  // Skip the search input which is the first child
-  const searchInput = container.firstChild;
-  
-  // Get all checkbox options except the search input
-  const options = Array.from(container.children).slice(1);
-  
-  // Separate into checked and unchecked arrays
-  const checked = [];
-  const unchecked = [];
-  
-  options.forEach(option => {
-    const checkbox = option.querySelector('input[type="checkbox"]');
-    if (checkbox && checkbox.checked) {
-      checked.push(option);
-    } else {
-      unchecked.push(option);
-    }
-  });
-
-  // Clear the container (except search input)
-  while (container.children.length > 1) {
-    container.removeChild(container.lastChild);
+function setupWebSocket(route) {
+  // Close any existing WebSocket connection
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.onclose = null;
+    socket.onerror = null;
+    socket.onmessage = null;
+    socket.close();
   }
 
-  // Add back in the desired order
-  checked.forEach(option => container.appendChild(option));
-  unchecked.forEach(option => container.appendChild(option));
+  // Reset the terminal
+  term.reset();
+  inputBuffer = "";
+
+  term.write("Connecting to backend...\r\n");
+
+  try {
+    // Establish a new WebSocket connection with explicit protocols
+    socket = new WebSocket(`ws://${location.host}/${route}`);
+
+    socket.onopen = () => {
+      term.write(
+        "Connection established. Please enter your details below:\r\n"
+      );
+
+      // Remove the previous input handler, if any
+      if (inputHandlerDisposable) {
+        // If your terminal library uses a different method, adjust this
+        inputHandlerDisposable.dispose();
+      }
+
+      // Define the input handler
+      inputHandler = (data) => {
+        if (data === "\u0004") {
+          // Ctrl+D pressed
+          term.write("\r\nTerminating session...\r\n");
+
+          if (socket && socket.readyState === WebSocket.OPEN) {
+            socket.close(1000, "User terminated session with Ctrl+D"); // 1000 = Normal Closure
+          }
+
+          // Optionally dispose of input handler
+          if (inputHandlerDisposable) {
+            inputHandlerDisposable.dispose();
+          }
+
+          return; // Skip processing further
+        }
+        if (data === "\r") {
+          try {
+            // Explicitly send as text
+            socket.send(inputBuffer);
+          } catch (e) {
+            term.write(`\r\nError sending data: ${e.message}\r\n`);
+          }
+          inputBuffer = "";
+          term.write("\r\n");
+        } else if (data === "\u007F") {
+          if (inputBuffer.length > 0) {
+            inputBuffer = inputBuffer.slice(0, -1);
+            term.write("\b \b");
+          }
+        } else {
+          inputBuffer += data;
+          term.write(data);
+        }
+      };
+
+      // Store the input handler - adapt this based on your terminal library
+      inputHandlerDisposable = term.onData(inputHandler);
+    };
+
+    socket.onmessage = (event) => {
+      try {
+        term.write(event.data);
+      } catch (e) {
+        term.write(`\r\nError displaying message: ${e.message}\r\n`);
+      }
+    };
+
+    socket.onclose = () => term.write("\r\nConnection closed. Code: \r\n");
+
+    socket.onerror = (error) => {
+      term.write(`\r\nWebSocket Error: ${JSON.stringify(error)}\r\n`);
+    };
+  } catch (error) {
+    term.write(`\r\nFailed to connect: ${error.message}\r\n`);
+  }
 }
 
-// Modify the createCheckboxOption function to add a class for easier selection
-function createCheckboxOption(text, clickHandler) {
-  const container = document.createElement('div');
-  container.className = 'dropdown-option';
-  
-  const checkbox = document.createElement('input');
-  checkbox.type = 'checkbox';
-  checkbox.style.marginRight = '5px';
-  
-  const label = document.createElement('span');
-  label.textContent = text;
-  
-  container.onclick = (event) => {
-    // Only toggle if clicking the container or label (not the checkbox directly)
-    if (event.target !== checkbox) {
-      checkbox.checked = !checkbox.checked;
-      clickHandler();
-    }
-  };
-  
-  checkbox.onclick = (event) => {
-    event.stopPropagation();
-    clickHandler();
-  };
-  
-  container.appendChild(checkbox);
-  container.appendChild(label);
-  return container;
-}
 
 
 
@@ -103,71 +100,19 @@ function createCheckboxOption(text, clickHandler) {
 
 
 
-table {
-      width: 100%;
-      border-collapse: collapse;
-      background-color: pink;
-    }
-
-    th, td {
-      padding: 10px;
-      border: 1px solid #ddd;
-      text-align: left;
-    }
-
-    th {
-      background-color: #f4f4f4;
-      font-weight: bold;
-    }
 
 
-    body {
-  margin: 0;
-  padding: 0;
-  font-family: Arial, sans-serif;
-}
 
-.header {
-  text-align: center;
-  background-color: #333;
-  color: white;
-  padding: 15px;
-}
 
-.initial_container {
-  text-align: center;
-  margin-top: 20px;
-}
 
-.initial_button {
-  margin: 10px;
-  padding: 10px 20px;
-  background-color: #4CAF50;
-  color: white;
-  border: none;
-  cursor: pointer;
-}
 
-.initial_button:hover {
-  background-color: #45a049;
-}
 
-.csv_table_container {
-  height: 500px;
-  overflow-y: auto;
-  border: 1px solid #ddd;
-  margin-top: 20px;
-  padding-bottom: 40px;  /* Account for the fixed bottom element */
-}
 
-.total-records {
-  position: fixed;
-  bottom: 0px;
-  left: 10px; /* Aligns to the bottom-left */
-  padding: 10px;
-  font-weight: bold;
-  z-index: 1000; /* Ensures it stays above other elements */
-}
+
+
+
+
+
 
 const options = {
     method: 'GET',
