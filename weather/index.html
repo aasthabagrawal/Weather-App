@@ -1,3 +1,37 @@
+const express = require('express');
+const axios = require('axios');
+const cors = require('cors');
+
+const app = express();
+const PORT = 4000;
+const API_KEY = 'your_actual_mir3_api_key_here'; // replace with your API key
+
+app.use(cors());
+
+app.get('/api/status', async (req, res) => {
+  try {
+    const response = await axios.get('https://mir3.co.uk/services/v1.2/mir3/status', {
+      headers: {
+        'x-api-key': API_KEY,
+        'Accept': 'application/json'
+      }
+    });
+    res.json(response.data);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).json({ error: 'Failed to fetch from MIR3' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Backend running on http://localhost:${PORT}`);
+});
+
+
+
+
+
+
 <!doctype html>
 <html lang="en">
   <head>
