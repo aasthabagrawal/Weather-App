@@ -7,33 +7,34 @@ require('dotenv').config();
 const app = express();
 const PORT = 4000;
 
+// Middleware to allow CORS and parse raw XML
 app.use(cors());
-
-// Middleware to parse raw XML body as text
 app.use(express.text({ type: 'text/xml' }));
 
-// POST endpoint to forward XML body to MIR3 API
 app.post('/api/status', async (req, res) => {
   try {
-    const response = await axios.post(process.env.MIR3_API, req.body, {
+    const xmlBody = req.body;
+
+    const response = await axios.post(process.env.MIR3_API, xmlBody, {
       headers: {
         'x-api-key': process.env.MIR3_KEY,
         'Content-Type': 'text/xml',
-        'Accept': 'application/xml',
-      },
+        'Accept': 'application/xml'
+      }
     });
 
-    const xml = response.data;
+    const responseXml = response.data;
 
-    xml2js.parseString(xml, { explicitArray: false }, (err, result) => {
+    xml2js.parseString(responseXml, { explicitArray: false }, (err, result) => {
       if (err) {
+        console.error('Parsing error:', err);
         return res.status(500).json({ error: 'XML Parsing Error' });
       }
-      res.json(result); // Send parsed JSON to frontend
+      res.json(result);
     });
 
   } catch (error) {
-    console.error('Fetch failed:', error.message);
+    console.error('Request failed:', error.message);
     res.status(500).json({ error: 'Failed to fetch data from MIR3' });
   }
 });
@@ -41,6 +42,7 @@ app.post('/api/status', async (req, res) => {
 app.listen(PORT, () => {
   console.log(`Backend server running at http://localhost:${PORT}`);
 });
+
 
 
 
