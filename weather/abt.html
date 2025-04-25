@@ -3,18 +3,30 @@ const axios = require('axios');
 const xml2js = require('xml2js');
 const cors = require('cors');
 require('dotenv').config();
-
 const app = express();
 const PORT = 4000;
 
-// Middleware to allow CORS and parse raw XML
+// Middleware
 app.use(cors());
-app.use(express.text({ type: 'text/xml' }));
+app.use(express.json());  // For parsing JSON from frontend
 
 app.post('/api/status', async (req, res) => {
   try {
-    const xmlBody = req.body;
-
+    // Get credentials from request or use stored values
+    const { username, password, uuid } = req.body;
+    
+    // Construct XML body
+    const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
+      <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+        <soap:Body>
+          <RequestStatus>
+            <user>${username}</user>
+            <password>${password}</password>
+            <uuid>${uuid}</uuid>
+          </RequestStatus>
+        </soap:Body>
+      </soap:Envelope>`;
+    
     const response = await axios.post(process.env.MIR3_API, xmlBody, {
       headers: {
         'x-api-key': process.env.MIR3_KEY,
@@ -22,9 +34,8 @@ app.post('/api/status', async (req, res) => {
         'Accept': 'application/xml'
       }
     });
-
+    
     const responseXml = response.data;
-
     xml2js.parseString(responseXml, { explicitArray: false }, (err, result) => {
       if (err) {
         console.error('Parsing error:', err);
@@ -32,10 +43,16 @@ app.post('/api/status', async (req, res) => {
       }
       res.json(result);
     });
-
   } catch (error) {
-    console.error('Request failed:', error.message);
-    res.status(500).json({ error: 'Failed to fetch data from MIR3' });
+    console.error('Request failed:', error);  // Log the full error object
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      console.error('Response data:', error.response.data);
+      console.error('Response status:', error.response.status);
+      console.error('Response headers:', error.response.headers);
+    }
+    res.status(500).json({ error: 'Failed to fetch data from MIR3', message: error.message });
   }
 });
 
