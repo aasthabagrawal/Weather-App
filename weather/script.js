@@ -1,3 +1,128 @@
+fetchALrt.js
+import axios from 'axios';
+
+export const fetchAlerts = async () => {
+  try {
+    const response = await axios.post('http://localhost:4000/api/status', {
+      username: 'yourUsername',   // Replace with your username
+      password: 'yourPassword',   // Replace with your password
+      uuid: 'yourUUID',            // This will be passed differently later if needed
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching alerts:', error);
+    return null;
+  }
+};
+
+processalert
+// This will process raw data and return open/closed counts
+export const processAlerts = (data) => {
+  let open = 0;
+  let closed = 0;
+  const activeAlerts = new Set();
+
+  if (!data || !data.ResponseStatus || !data.ResponseStatus.alerts) {
+    return { open, closed };
+  }
+
+  const alerts = Array.isArray(data.ResponseStatus.alerts.alert)
+    ? data.ResponseStatus.alerts.alert
+    : [data.ResponseStatus.alerts.alert];
+
+  alerts.forEach((alert) => {
+    const title = alert.title || '';
+
+    if (title.toLowerCase().includes('final update')) {
+      // Close the related open alert
+      const baseTitle = title.toLowerCase().replace(' - final update', '').trim();
+      if (activeAlerts.has(baseTitle)) {
+        activeAlerts.delete(baseTitle);
+        closed++;
+      }
+    } else if (!title.toLowerCase().includes('update')) {
+      // New open alert
+      const baseTitle = title.toLowerCase().trim();
+      activeAlerts.add(baseTitle);
+      open++;
+    }
+  });
+
+  return { open, closed };
+};
+
+piechartalert.js
+
+import React from 'react';
+import { PieChart, Pie, Cell, Legend } from 'recharts';
+
+const COLORS = ['#FF0000', '#FFD700']; // Red for Open, Yellow for Closed
+
+const PieChartComponent = ({ data }) => {
+  const chartData = [
+    { name: 'Open', value: data.open },
+    { name: 'Closed', value: data.closed },
+  ];
+
+  return (
+    <PieChart width={400} height={400}>
+      <Pie
+        data={chartData}
+        cx="50%"
+        cy="50%"
+        labelLine={false}
+        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+        outerRadius={150}
+        fill="#8884d8"
+        dataKey="value"
+      >
+        {chartData.map((entry, index) => (
+          <Cell key={`cell-${index}`} fill={COLORS[index]} />
+        ))}
+      </Pie>
+      <Legend />
+    </PieChart>
+  );
+};
+
+export default PieChartComponent;
+
+App.js
+import React, { useState, useEffect } from 'react';
+import { fetchAlerts } from './api/fetchAlerts';
+import { processAlerts } from './utils/processAlerts';
+import PieChartComponent from './components/PieChartComponent';
+import './styles.css';
+
+const App = () => {
+  const [alertData, setAlertData] = useState({ open: 0, closed: 0 });
+
+  const getData = async () => {
+    const rawData = await fetchAlerts();
+    if (rawData) {
+      const processed = processAlerts(rawData);
+      setAlertData(processed);
+    }
+  };
+
+  useEffect(() => {
+    getData();  // initial fetch
+    const interval = setInterval(() => {
+      getData();  // fetch every 10 seconds
+    }, 10000);
+
+    return () => clearInterval(interval); // cleanup
+  }, []);
+
+  return (
+    <div className="app-container">
+      <h1>Alert Status Dashboard</h1>
+      <PieChartComponent data={alertData} />
+    </div>
+  );
+};
+
+export default App;
 
 const options = {
     method: 'GET',
