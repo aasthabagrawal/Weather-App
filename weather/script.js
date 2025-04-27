@@ -1,3 +1,16 @@
+.app-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 30px;
+}
+
+h1 {
+  color: #333;
+  margin-bottom: 20px;
+}
+
+
 fetchALrt.js
 import axios from 'axios';
 
