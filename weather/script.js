@@ -1,3 +1,40 @@
+import React from 'react';
+import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
+
+const COLORS = ['#FF0000', '#FFD700']; // Red for Open, Yellow for Closed
+
+const PieChartComponent = ({ data }) => {
+  const chartData = [
+    { name: 'Open', value: data.open },
+    { name: 'Closed', value: data.closed },
+  ];
+
+  return (
+    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+      <PieChart width={400} height={400}>
+        <Pie
+          data={chartData}
+          cx="50%"
+          cy="50%"
+          label
+          outerRadius={120}
+          fill="#8884d8"
+          dataKey="value"
+        >
+          {chartData.map((entry, index) => (
+            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+          ))}
+        </Pie>
+        <Tooltip />
+        <Legend verticalAlign="bottom" height={36}/>
+      </PieChart>
+    </div>
+  );
+};
+
+export default PieChartComponent;
+
+
 .app-container {
   display: flex;
   flex-direction: column;
