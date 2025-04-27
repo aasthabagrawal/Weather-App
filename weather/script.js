@@ -66,13 +66,13 @@ export const fetchAlerts = async () => {
 };
 
 processalert
-// This will process raw data and return open/closed counts
 export const processAlerts = (data) => {
   let open = 0;
   let closed = 0;
   const activeAlerts = new Set();
 
   if (!data || !data.ResponseStatus || !data.ResponseStatus.alerts) {
+    console.warn("No valid alert data found.");
     return { open, closed };
   }
 
@@ -83,16 +83,17 @@ export const processAlerts = (data) => {
   alerts.forEach((alert) => {
     const title = alert.title || '';
 
+    const baseTitle = title.toLowerCase().replace(/ - final update$/, '').replace(/ - update\d*$/, '').trim();
+
+    // Check if it's a "final update" and close the alert
     if (title.toLowerCase().includes('final update')) {
-      // Close the related open alert
-      const baseTitle = title.toLowerCase().replace(' - final update', '').trim();
       if (activeAlerts.has(baseTitle)) {
         activeAlerts.delete(baseTitle);
         closed++;
       }
-    } else if (!title.toLowerCase().includes('update')) {
-      // New open alert
-      const baseTitle = title.toLowerCase().trim();
+    }
+    // Only open a new alert if it's not an update
+    else if (!title.toLowerCase().includes('update') && !activeAlerts.has(baseTitle)) {
       activeAlerts.add(baseTitle);
       open++;
     }
@@ -100,6 +101,7 @@ export const processAlerts = (data) => {
 
   return { open, closed };
 };
+
 
 piechartalert.js
 
