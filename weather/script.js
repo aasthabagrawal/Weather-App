@@ -1,39 +1,42 @@
-import React from 'react';
-import { PieChart, Pie, Cell, Tooltip, Legend } from 'recharts';
-
-const COLORS = ['#FF0000', '#FFD700']; // Red for Open, Yellow for Closed
-
-const PieChartComponent = ({ data }) => {
-  const chartData = [
-    { name: 'Open', value: data.open },
-    { name: 'Closed', value: data.closed },
-  ];
-
-  return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-      <PieChart width={400} height={400}>
-        <Pie
-          data={chartData}
-          cx="50%"
-          cy="50%"
-          label
-          outerRadius={120}
-          fill="#8884d8"
-          dataKey="value"
-        >
-          {chartData.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-          ))}
-        </Pie>
-        <Tooltip />
-        <Legend verticalAlign="bottom" height={36}/>
-      </PieChart>
-    </div>
-  );
+export const fetchAlerts = async () => {
+  try {
+    const response = await axios.post('http://localhost:4000/api/status', {});
+    console.log('Full response:', response);
+    
+    const data = response.data;
+    
+    // Navigate through the actual structure
+    if (data && data['soapEnv:Envelope']) {
+      const envelope = data['soapEnv:Envelope'];
+      const body = envelope['soapenv:Body'];
+      
+      if (body && body.response) {
+        const responseData = body.response;
+        
+        // Check if search report exists
+        if (responseData.searchReportResponse) {
+          console.log('Found search report data');
+          return {
+            ResponseStatus: {
+              alerts: {
+                alert: responseData.searchReportResponse.searchResult.map(result => ({
+                  title: result.reportSummary.title
+                }))
+              }
+            }
+          };
+        }
+      }
+    }
+    
+    console.log('Could not parse expected data structure');
+    return null;
+    
+  } catch (error) {
+    console.error('Error fetching alerts:', error);
+    return null;
+  }
 };
-
-export default PieChartComponent;
-
 
 .app-container {
   display: flex;
