@@ -1,3 +1,47 @@
+/  Another Pie Chart component just below
+
+export const InformationPieChartComponent = ({ data, title }) => {
+  const pieData = [
+    { name: 'Information Alerts Open', value: data.open || 0 },
+  ];
+
+  return (
+    <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+      <h2>{title}</h2> {/* Title for second pie chart */}
+      <PieChart width={400} height={300}>
+        <Pie
+          data={pieData}
+          cx={200}
+          cy={150}
+          innerRadius={50}
+          outerRadius={100}
+          fill="#00C49F"
+          dataKey="value"
+          label={({ name, value }) => `${name}: ${value}`}
+        >
+          {pieData.map((entry, index) => (
+            <Cell key={`Cell-Info-${index}`} fill="#00C49F" />
+          ))}
+        </Pie>
+        <Tooltip />
+        <Legend />
+      </PieChart>
+    </div>
+  );
+};
+
+export default PieChartComponent;
+
+
+
+
+
+
+
+
+
+
+
 // New function for Information Alerts
 export const processInformationAlerts = (alerts) => {
   let open = 0;
