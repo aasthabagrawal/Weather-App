@@ -11,7 +11,6 @@ export const fetchAlerts = async () => {
     const data = response.data;
     console.log("Full fetched data:", JSON.stringify(data, null, 2));
 
-    // Dynamically get the Envelope key (example: "soapenv:Envelope" or "soap:Envelope")
     const envelopeKey = Object.keys(data).find(key => key.toLowerCase().includes('envelope'));
     const envelope = data[envelopeKey];
 
@@ -21,14 +20,22 @@ export const fetchAlerts = async () => {
     const responseKey = Object.keys(body).find(key => key.toLowerCase().includes('response'));
     const responseStatus = body[responseKey];
 
-    console.log("Extracted responseStatus:", responseStatus);
+    if (!responseStatus || !responseStatus.searchReportResponse) {
+      console.error('Unexpected response structure');
+      return null;
+    }
 
-    return responseStatus;
+    const searchResults = responseStatus.searchReportResponse.searchResult;
+
+    console.log("Extracted search results:", searchResults);
+
+    return searchResults;  // 🔥 send searchResult array
   } catch (error) {
     console.error('Error fetching alerts:', error.message || error);
     return null;
   }
 };
+
 
 
 
