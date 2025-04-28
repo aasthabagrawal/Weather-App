@@ -11,29 +11,75 @@ export const fetchAlerts = async () => {
     const data = response.data;
     console.log("Full fetched data:", JSON.stringify(data, null, 2));
 
-    const envelopeKey = Object.keys(data).find(key => key.toLowerCase().includes('envelope'));
-    const envelope = data[envelopeKey];
-
-    const bodyKey = Object.keys(envelope).find(key => key.toLowerCase().includes('body'));
-    const body = envelope[bodyKey];
-
-    const responseKey = Object.keys(body).find(key => key.toLowerCase().includes('response'));
-    const responseStatus = body[responseKey];
-
-    if (!responseStatus || !responseStatus.searchReportResponse) {
-      console.error('Unexpected response structure');
+    const envelope = data['soapenv:Envelope'];    // first level
+    if (!envelope) {
+      console.error("Envelope not found!");
       return null;
     }
 
-    const searchResults = responseStatus.searchReportResponse.searchResult;
+    const body = envelope['soapenv:Body'];         // second level
+    if (!body) {
+      console.error("Body not found!");
+      return null;
+    }
 
-    console.log("Extracted search results:", searchResults);
+    const responseObj = body['response'];           // third level
+    if (!responseObj) {
+      console.error("Response not found!");
+      return null;
+    }
 
-    return searchResults;  // 🔥 send searchResult array
+    const searchReport = responseObj['searchReportResponse'];  // fourth level
+    if (!searchReport) {
+      console.error("searchReportResponse not found!");
+      return null;
+    }
+
+    const searchResult = searchReport['searchResult'];          // final level
+    if (!searchResult) {
+      console.error("searchResult not found!");
+      return null;
+    }
+
+    console.log("Extracted searchResult:", searchResult);
+
+    return searchResult;   // ✅ return the list of alerts
   } catch (error) {
     console.error('Error fetching alerts:', error.message || error);
     return null;
   }
+};
+
+
+
+
+export const processAlerts = (alerts) => {
+  let open = 0;
+  let closed = 0;
+  const activeAlerts = new Set();
+
+  if (!alerts || !Array.isArray(alerts)) {
+    console.warn("No valid alert data found.");
+    return { open, closed };
+  }
+
+  alerts.forEach((alertItem) => {
+    const title = alertItem.reportSummary?.title || '';
+
+    const baseTitle = title.toLowerCase().replace(/ - final update$/, '').replace(/ - update\d*$/, '').trim();
+
+    if (title.toLowerCase().includes('final update')) {
+      if (activeAlerts.has(baseTitle)) {
+        activeAlerts.delete(baseTitle);
+        closed++;
+      }
+    } else if (!title.toLowerCase().includes('update') && !activeAlerts.has(baseTitle)) {
+      activeAlerts.add(baseTitle);
+      open++;
+    }
+  });
+
+  return { open, closed };
 };
 
 
