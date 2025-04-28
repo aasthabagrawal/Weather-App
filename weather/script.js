@@ -1,36 +1,53 @@
-import React, { useState, useEffect } from 'react';
-import { fetchAlerts } from './api/fetchAlerts';
-import { processAlerts } from './utils/processAlerts';
-import PieChartComponent from './components/PieChartComponent';
-import './styles.css';
-
-const App = () => {
-  const [alertData, setAlertData] = useState({ open: 0, closed: 0 });
-
-  const getData = async () => {
-    const searchResults = await fetchAlerts();
-    if (searchResults) {
-      const processed = processAlerts(searchResults);
-      setAlertData(processed);
-    }
-  };
-
-  useEffect(() => {
-    getData();  // Initial fetch
-    const interval = setInterval(getData, 10000); // Poll every 10 sec
-    return () => clearInterval(interval); // Cleanup on unmount
-  }, []);
-
-  return (
-    <div className="app-container">
-      <h1>Alert Status Dashboard</h1>
-      <PieChartComponent data={alertData} />
+return (
+  <div className="app-container">
+    <h1>Alert Status Dashboard</h1>
+    <div className="charts-container">
+      <div className="chart-box">
+        <h2>Alert Status</h2>
+        <PieChartComponent 
+          data={[
+            { name: 'Open', value: alertData.open },
+            { name: 'Closed', value: alertData.closed }
+          ]}
+        />
+      </div>
+      {/* Add more chart-box divs here for your other pie charts */}
     </div>
-  );
-};
+  </div>
+);
 
-export default App;
 
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start; /* Change from center to flex-start to align left */
+  margin: 30px;
+  width: 100%;
+}
+
+h1 {
+  color: #333;
+  margin-bottom: 20px;
+}
+
+/* Add this for your charts layout */
+.charts-container {
+  display: flex;
+  flex-wrap: wrap;
+  width: 100%;
+  gap: 20px;
+}
+
+/* Style for individual chart containers */
+.chart-box {
+  flex: 1 1 calc(50% - 20px); /* For 2x2 grid layout */
+  min-width: 300px;
+  border: 1px solid #eaeaea;
+  border-radius: 8px;
+  padding: 15px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
 
 
 
