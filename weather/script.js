@@ -1,3 +1,36 @@
+// New function for Information Alerts
+export const processInformationAlerts = (alerts) => {
+  let open = 0;
+
+  if (!alerts || !Array.isArray(alerts)) {
+    console.warn("No valid alert data found for Information Alerts.");
+    return { open };
+  }
+
+  alerts.forEach((alertItem) => {
+    const title = alertItem.reportSummary?.title || '';
+
+    if (title.toLowerCase().includes('information alert')) {
+      open++;
+    }
+  });
+
+  return { open };
+};
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 return (
   <div className="app-container">
     <h1>Alert Status Dashboard</h1>
