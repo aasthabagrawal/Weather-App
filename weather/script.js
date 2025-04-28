@@ -1,3 +1,47 @@
+import React, { useState, useEffect } from 'react';
+import { fetchAlerts } from './api/fetchAlerts';
+import { processAlerts } from './utils/processAlerts';
+import PieChartComponent from './components/PieChartComponent';
+import './styles.css';
+
+const App = () => {
+  const [alertData, setAlertData] = useState({ open: 0, closed: 0 });
+
+  const getData = async () => {
+    const searchResults = await fetchAlerts();
+    if (searchResults) {
+      const processed = processAlerts(searchResults);
+      setAlertData(processed);
+    }
+  };
+
+  useEffect(() => {
+    getData();  // Initial fetch
+    const interval = setInterval(getData, 10000); // Poll every 10 sec
+    return () => clearInterval(interval); // Cleanup on unmount
+  }, []);
+
+  return (
+    <div className="app-container">
+      <h1>Alert Status Dashboard</h1>
+      <PieChartComponent data={alertData} />
+    </div>
+  );
+};
+
+export default App;
+
+
+
+
+
+
+
+
+
+
+
+
 import axios from 'axios';
 
 export const fetchAlerts = async () => {
