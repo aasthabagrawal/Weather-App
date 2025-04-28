@@ -1,42 +1,36 @@
+import axios from 'axios';
+
 export const fetchAlerts = async () => {
   try {
-    const response = await axios.post('http://localhost:4000/api/status', {});
-    console.log('Full response:', response);
-    
+    const response = await axios.post('http://localhost:4000/api/status', {
+      username: 'yourUsername',
+      password: 'yourPassword',
+      uuid: 'yourUUID',
+    });
+
     const data = response.data;
-    
-    // Navigate through the actual structure
-    if (data && data['soapEnv:Envelope']) {
-      const envelope = data['soapEnv:Envelope'];
-      const body = envelope['soapenv:Body'];
-      
-      if (body && body.response) {
-        const responseData = body.response;
-        
-        // Check if search report exists
-        if (responseData.searchReportResponse) {
-          console.log('Found search report data');
-          return {
-            ResponseStatus: {
-              alerts: {
-                alert: responseData.searchReportResponse.searchResult.map(result => ({
-                  title: result.reportSummary.title
-                }))
-              }
-            }
-          };
-        }
-      }
-    }
-    
-    console.log('Could not parse expected data structure');
-    return null;
-    
+    console.log("Full fetched data:", JSON.stringify(data, null, 2));
+
+    // Dynamically get the Envelope key (example: "soapenv:Envelope" or "soap:Envelope")
+    const envelopeKey = Object.keys(data).find(key => key.toLowerCase().includes('envelope'));
+    const envelope = data[envelopeKey];
+
+    const bodyKey = Object.keys(envelope).find(key => key.toLowerCase().includes('body'));
+    const body = envelope[bodyKey];
+
+    const responseKey = Object.keys(body).find(key => key.toLowerCase().includes('response'));
+    const responseStatus = body[responseKey];
+
+    console.log("Extracted responseStatus:", responseStatus);
+
+    return responseStatus;
   } catch (error) {
-    console.error('Error fetching alerts:', error);
+    console.error('Error fetching alerts:', error.message || error);
     return null;
   }
 };
+
+
 
 .app-container {
   display: flex;
