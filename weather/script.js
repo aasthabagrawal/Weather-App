@@ -1,3 +1,94 @@
+import React, { useState, useEffect } from 'react';
+import { fetchAlerts } from './api/fetchAlerts';
+import { processAlerts, processInformationAlerts } from './utils/processAlerts';
+import PieChartComponent from './components/PieChartComponent';
+import './styles.css';
+
+const App = () => {
+  const [dataGroups, setDataGroups] = useState({
+    highAlert: { open: 0, closed: 0 },
+    codeRed: { open: 0, closed: 0 },
+    codeYellow: { open: 0, closed: 0 },
+    infoAlert: { open: 0 },
+  });
+
+  const getData = async () => {
+    const response = await fetchAlerts();
+    const alerts = response?.soapenv?.Body?.Response?.searchReportResponse?.searchResult || [];
+
+    if (alerts.length > 0) {
+      const highAlert = alerts.filter(a =>
+        a?.reportSummary?.title?.toLowerCase().includes('high alert')
+      );
+      const codeRed = alerts.filter(a =>
+        a?.reportSummary?.title?.toLowerCase().includes('code red')
+      );
+      const codeYellow = alerts.filter(a =>
+        a?.reportSummary?.title?.toLowerCase().includes('code yellow')
+      );
+      const infoAlert = alerts.filter(a =>
+        a?.reportSummary?.title?.toLowerCase().includes('information alert')
+      );
+
+      setDataGroups({
+        highAlert: processAlerts(highAlert),
+        codeRed: processAlerts(codeRed),
+        codeYellow: processAlerts(codeYellow),
+        infoAlert: processInformationAlerts(infoAlert),
+      });
+    }
+  };
+
+  useEffect(() => {
+    getData();
+    const interval = setInterval(getData, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return (
+    <div className="app-container">
+      <h1>Alert Dashboard</h1>
+
+      <h2>High Alerts</h2>
+      <PieChartComponent
+        data={[
+          { name: 'Open', value: dataGroups.highAlert.open },
+          { name: 'Closed', value: dataGroups.highAlert.closed },
+        ]}
+      />
+
+      <h2>Code Red</h2>
+      <PieChartComponent
+        data={[
+          { name: 'Open', value: dataGroups.codeRed.open },
+          { name: 'Closed', value: dataGroups.codeRed.closed },
+        ]}
+      />
+
+      <h2>Code Yellow</h2>
+      <PieChartComponent
+        data={[
+          { name: 'Open', value: dataGroups.codeYellow.open },
+          { name: 'Closed', value: dataGroups.codeYellow.closed },
+        ]}
+      />
+
+      <h2>Information Alerts</h2>
+      <PieChartComponent
+        data={[
+          { name: 'Open', value: dataGroups.infoAlert.open },
+        ]}
+      />
+    </div>
+  );
+};
+
+export default App;
+
+
+
+
+
 // utils/cleanTitle.js
 export const cleanTitle = (rawTitle) => {
   if (!rawTitle) return '';
