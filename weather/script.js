@@ -1,3 +1,17 @@
+import axios from 'axios';
+
+export const fetchAlerts = async () => {
+  try {
+    const response = await axios.post('http://localhost:4000/api/status');
+    return Array.isArray(response.data) ? response.data : [];
+  } catch (error) {
+    console.error('Failed to fetch alerts:', error.message);
+    return [];
+  }
+};
+
+
+
 const express = require('express');
 const axios = require('axios');
 const xml2js = require('xml2js');
@@ -11,16 +25,19 @@ const PORT = 4000;
 app.use(cors());
 app.use(express.json());
 
-const fetchPaginatedData = async (username, password) => {
-  let startIndex = 1;
+app.post('/api/status', async (req, res) => {
+  const username = 'hfjd';
+  const password = 'dsafs';
   const maxResult = 1000;
-  const allResults = [];
+  let startIndex = 1;
+  let allResults = [];
+  let moreData = true;
 
-  while (true) {
-    const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
-      <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
-        <soap:Body>
-          <SearchRequest>
+  try {
+    while (moreData) {
+      const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
+        <soapenv:Envelope xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope">
+          <soapenv:Body>
             <authorization>
               <user>${username}</user>
               <password>${password}</password>
@@ -32,46 +49,62 @@ const fetchPaginatedData = async (username, password) => {
                 <initiatedafter>2025-01-01T00:00:00.000-08:00</initiatedafter>
               </and>
             </query>
-          </SearchRequest>
-        </soap:Body>
-      </soap:Envelope>`;
+          </soapenv:Body>
+        </soapenv:Envelope>`;
 
-    const response = await axios.post(process.env.MIR3_API, xmlBody, {
-      headers: {
-        'x-api-key': process.env.MIR3_KEY,
-        'Content-Type': 'text/xml',
-        'Accept': 'application/xml'
-      },
-      httpsAgent: new https.Agent({ rejectUnauthorized: false })
-    });
+      const response = await axios.post(process.env.MIR3_API, xmlBody, {
+        headers: {
+          'Content-Type': 'text/xml',
+          'Accept': 'text/xml',
+        },
+        httpsAgent: new https.Agent({
+          rejectUnauthorized: false,
+        }),
+      });
 
-    const parsed = await xml2js.parseStringPromise(response.data, { explicitArray: false });
+      const responseXml = response.data;
 
-    const body = parsed?.['soap:Envelope']?.['soap:Body'];
-    const searchResponse = body?.response?.searchReportResponse;
+      const parsed = await new Promise((resolve, reject) => {
+        xml2js.parseString(responseXml, { explicitArray: false }, (err, result) => {
+          if (err) reject(err);
+          else resolve(result);
+        });
+      });
 
-    const batch = searchResponse?.searchResult;
-    const batchArray = Array.isArray(batch) ? batch : batch ? [batch] : [];
+      const envelope = parsed?.['soapenv:Envelope'];
+      const body = envelope?.['soapenv:Body'];
+      const responseNode = body?.response?.searchReportsResponse;
 
-    allResults.push(...batchArray);
+      if (!responseNode) {
+        console.warn('Unexpected SOAP structure:', parsed);
+        break;
+      }
 
-    const matchCount = parseInt(searchResponse?.matchCount || '0', 10);
-    const returnCount = parseInt(searchResponse?.returnCount || '0', 10);
+      const searchResult = responseNode?.searchResult;
+      const matchCount = parseInt(responseNode?.matchCount || '0', 10);
 
-    if (startIndex + returnCount > matchCount) break;
-    startIndex += returnCount;
-  }
+      let currentResults = [];
 
-  return allResults;
-};
+      if (Array.isArray(searchResult)) {
+        currentResults = searchResult;
+      } else if (searchResult) {
+        currentResults = [searchResult];
+      }
 
-app.post('/api/status', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    const results = await fetchPaginatedData(username, password);
-    res.json(results);
+      allResults = allResults.concat(currentResults);
+
+      console.log(`Fetched ${allResults.length} of ${matchCount} total`);
+
+      if (startIndex + maxResult > matchCount) {
+        moreData = false;
+      } else {
+        startIndex += maxResult;
+      }
+    }
+
+    res.json(allResults);
   } catch (error) {
-    console.error('Error:', error.message);
+    console.error('API call failed:', error.message);
     res.status(500).json({ error: 'Internal server error' });
   }
 });
