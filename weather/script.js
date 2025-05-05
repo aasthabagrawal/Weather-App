@@ -1,3 +1,88 @@
+const express = require('express');
+const axios = require('axios');
+const xml2js = require('xml2js');
+const cors = require('cors');
+const https = require('https');
+require('dotenv').config();
+
+const app = express();
+const PORT = 4000;
+
+app.use(cors());
+app.use(express.json());
+
+const fetchPaginatedData = async (username, password) => {
+  let startIndex = 1;
+  const maxResult = 1000;
+  const allResults = [];
+
+  while (true) {
+    const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
+      <soap:Envelope xmlns:soap="http://www.w3.org/2003/05/soap-envelope">
+        <soap:Body>
+          <SearchRequest>
+            <authorization>
+              <user>${username}</user>
+              <password>${password}</password>
+            </authorization>
+            <startIndex>${startIndex}</startIndex>
+            <maxResult>${maxResult}</maxResult>
+            <query>
+              <and>
+                <initiatedafter>2025-01-01T00:00:00.000-08:00</initiatedafter>
+              </and>
+            </query>
+          </SearchRequest>
+        </soap:Body>
+      </soap:Envelope>`;
+
+    const response = await axios.post(process.env.MIR3_API, xmlBody, {
+      headers: {
+        'x-api-key': process.env.MIR3_KEY,
+        'Content-Type': 'text/xml',
+        'Accept': 'application/xml'
+      },
+      httpsAgent: new https.Agent({ rejectUnauthorized: false })
+    });
+
+    const parsed = await xml2js.parseStringPromise(response.data, { explicitArray: false });
+
+    const body = parsed?.['soap:Envelope']?.['soap:Body'];
+    const searchResponse = body?.response?.searchReportResponse;
+
+    const batch = searchResponse?.searchResult;
+    const batchArray = Array.isArray(batch) ? batch : batch ? [batch] : [];
+
+    allResults.push(...batchArray);
+
+    const matchCount = parseInt(searchResponse?.matchCount || '0', 10);
+    const returnCount = parseInt(searchResponse?.returnCount || '0', 10);
+
+    if (startIndex + returnCount > matchCount) break;
+    startIndex += returnCount;
+  }
+
+  return allResults;
+};
+
+app.post('/api/status', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    const results = await fetchPaginatedData(username, password);
+    res.json(results);
+  } catch (error) {
+    console.error('Error:', error.message);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running at http://localhost:${PORT}`);
+});
+
+
+
+
 import React, { useState, useEffect } from 'react';
 import { fetchAlerts } from './api/fetchAlerts';
 import { processAlerts, processInformationAlerts } from './utils/processAlerts';
