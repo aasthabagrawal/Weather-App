@@ -1,14 +1,39 @@
-Fetch Daetils
+app.post('/api/report-search', async (req, res) => {
+  const { uuid } = req.body;
+  const username = 'your_user';
+  const password = 'your_pass';
 
-export const fetchDetailedAlerts = async (uuids) => {
+  const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
+  <soapenv:Envelope xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope">
+    <soapenv:Body>
+      <ReportSearch>
+        <authorization>
+          <user>${username}</user>
+          <password>${password}</password>
+        </authorization>
+        <uuid>${uuid}</uuid>
+      </ReportSearch>
+    </soapenv:Body>
+  </soapenv:Envelope>`;
+
   try {
-    const response = await axios.post('http://localhost:4000/api/alert-details', { uuids });
-    return response.data; // array of { uuid, detail: parsedData }
+    const response = await axios.post(process.env.MIR3_API, xmlBody, {
+      headers: { 'Content-Type': 'text/xml', Accept: 'text/xml' },
+      httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+    });
+
+    const responseXml = response.data;
+    xml2js.parseString(responseXml, { explicitArray: false }, (err, result) => {
+      if (err) return res.status(500).json({ error: 'XML parsing error' });
+      
+      const status = result?.['soapenv:Envelope']?.['soapenv:Body']?.ReportSearchResponse?.status;
+      res.json({ status });
+    });
   } catch (error) {
-    console.error('Failed to fetch detailed alerts:', error.message);
-    return [];
+    console.error('ReportSearch failed:', error.message);
+    res.status(500).json({ error: 'ReportSearch failed' });
   }
-};
+});
 
 
 
