@@ -1,14 +1,81 @@
-import axios from 'axios';
+Fetch Daetils
 
-export const fetchAlerts = async () => {
+export const fetchDetailedAlerts = async (uuids) => {
   try {
-    const response = await axios.post('http://localhost:4000/api/status');
-    return Array.isArray(response.data) ? response.data : [];
+    const response = await axios.post('http://localhost:4000/api/alert-details', { uuids });
+    return response.data; // array of { uuid, detail: parsedData }
   } catch (error) {
-    console.error('Failed to fetch alerts:', error.message);
+    console.error('Failed to fetch detailed alerts:', error.message);
     return [];
   }
 };
+
+
+
+
+app.post('/api/alert-details', async (req, res) => {
+  const { uuids } = req.body;
+
+  if (!Array.isArray(uuids) || uuids.length === 0) {
+    return res.status(400).json({ error: 'UUIDs are required' });
+  }
+
+  const username = 'hfjd';
+  const password = 'dsafs';
+
+  try {
+    const results = [];
+
+    for (const uuid of uuids) {
+      const xmlBody = `<?xml version="1.0" encoding="UTF-8"?>
+        <soapenv:Envelope xmlns:soapenv="http://www.w3.org/2003/05/soap-envelope">
+          <soapenv:Body>
+            <ReportSearch>
+              <authorization>
+                <user>${username}</user>
+                <password>${password}</password>
+              </authorization>
+              <uuid>${uuid}</uuid>
+            </ReportSearch>
+          </soapenv:Body>
+        </soapenv:Envelope>`;
+
+      const response = await axios.post(process.env.MIR3_API, xmlBody, {
+        headers: {
+          'Content-Type': 'text/xml',
+          Accept: 'text/xml',
+        },
+        httpsAgent: new https.Agent({
+          rejectUnauthorized: false,
+        }),
+      });
+
+      const responseXml = response.data;
+
+      const parsed = await new Promise((resolve, reject) => {
+        xml2js.parseString(responseXml, { explicitArray: false }, (err, result) => {
+          if (err) reject(err);
+          else resolve(result);
+        });
+      });
+
+      const detail =
+        parsed?.['soapenv:Envelope']?.['soapenv:Body']?.response?.reportSearchResponse;
+
+      if (detail) {
+        results.push({ uuid, detail });
+      } else {
+        console.warn(`No detail for uuid ${uuid}`);
+      }
+    }
+
+    res.json(results);
+  } catch (error) {
+    console.error('Detail fetch failed:', error.message);
+    res.status(500).json({ error: 'Failed to fetch alert details' });
+  }
+});
+
 
 
 
