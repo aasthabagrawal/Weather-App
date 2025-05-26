@@ -1,3 +1,96 @@
+import axios from 'axios';
+import stringSimilarity from 'string-similarity';
+
+export const processAlerts = async (data, uuidMap = {}) => {
+  let open = 0;
+  let closed = 0;
+  const activeAlerts = new Set();
+  const finalUpdates = [];
+  const noiseWords = new Set([
+    'high', 'alert', 'final', 'update', 'reg', 'sc',
+    'auto', 'automatically', 'initiated', 'cap', 'report', 'summary'
+  ]);
+
+  const getCoreWords = (title = '') =>
+    new Set(
+      title
+        .toLowerCase()
+        .replace(/update\s*#?\d+.*$/i, '')
+        .replace(/final update.*$/i, '')
+        .replace(/\.[a-z]{2,5}\b/g, '')
+        .replace(/[^\w\s]/g, '')
+        .split(/\s+/)
+        .filter(word => word.length > 2 && !noiseWords.has(word))
+    );
+
+  const normalizeTitle = (title = '') =>
+    title
+      .toLowerCase()
+      .replace(/update\s*#?\d+.*$/i, '')
+      .replace(/final update.*$/i, '')
+      .replace(/\.[a-z]{2,5}\b/g, '')
+      .replace(/[^\w\s]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const areTitlesEquivalent = (a, b) => {
+    const sim = stringSimilarity.compareTwoStrings(normalizeTitle(a), normalizeTitle(b));
+    if (sim >= 0.85) return true;
+
+    const coreA = getCoreWords(a);
+    const coreB = getCoreWords(b);
+    const common = [...coreA].filter(word => coreB.has(word));
+    const ratio = common.length / Math.min(coreA.size, coreB.size);
+    return ratio >= 0.7;
+  };
+
+  let alerts = Array.isArray(data) ? data : data?.ResponseStatus?.alerts?.alert || [];
+
+  if (!Array.isArray(alerts)) alerts = [alerts];
+
+  // PASS 1: Identify base/high alerts
+  alerts.forEach(alert => {
+    const title = alert?.reportSummary?.title || alert?.title || '';
+    if (!/high\s*alert/i.test(title)) return;
+
+    const isFinal = /final update/i.test(title);
+    const isIntermediate = /update\s*#?\d+/i.test(title) && !isFinal;
+
+    if (!isFinal && !isIntermediate) {
+      const matched = [...activeAlerts].some(t => areTitlesEquivalent(t, title));
+      if (!matched) {
+        activeAlerts.add(title);
+        open++;
+      }
+    }
+  });
+
+  // PASS 2: For all active alerts, check /api/report-search to verify "Status: Resolved"
+  const verifiedClosed = [];
+
+  for (const title of [...activeAlerts]) {
+    const uuid = uuidMap[title];
+    if (!uuid) continue;
+
+    try {
+      const { data } = await axios.post('http://localhost:4000/api/report-search', { uuid });
+      const textContent = data?.notificationReport?.text || '';
+
+      if (/Status:\s*Resolved/i.test(textContent)) {
+        verifiedClosed.push(title);
+        open--;
+        closed++;
+      }
+    } catch (e) {
+      console.warn(`❌ Could not fetch detail for "${title}": ${e.message}`);
+    }
+  }
+
+  return { open, closed };
+};
+
+
+
 app.post('/api/report-search', async (req, res) => {
   const { uuid } = req.body;
   const username = 'your_user';
