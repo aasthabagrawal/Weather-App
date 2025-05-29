@@ -1,5 +1,46 @@
+import stringSimilarity from 'string-similarity';
+
+const noiseWords = new Set([
+  'code', 'yellow', 'green', 'alert', 'final', 'update',
+  'reg', 'auto', 'automatically', 'initiated', 'report', 'summary', 'test'
+]);
+
+const normalizeTitle = (title = '') => {
+  return title
+    .toLowerCase()
+    .replace(/update\s*#?\d+.*$/i, '')
+    .replace(/final update.*$/i, '')
+    .replace(/\.[a-z]{2,5}\b/g, '')
+    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+};
+
+const getCoreWords = (title = '') => {
+  return new Set(
+    normalizeTitle(title)
+      .split(/\s+/)
+      .filter(word => word.length > 2 && !noiseWords.has(word))
+  );
+};
+
+const areTitlesEquivalent = (a, b) => {
+  const normA = normalizeTitle(a);
+  const normB = normalizeTitle(b);
+
+  const sim = stringSimilarity.compareTwoStrings(normA, normB);
+  if (sim >= 0.85) return true;
+
+  const coreA = getCoreWords(a);
+  const coreB = getCoreWords(b);
+  const intersection = [...coreA].filter(w => coreB.has(w));
+  const ratio = intersection.length / Math.min(coreA.size, coreB.size);
+
+  return ratio >= 0.7;
+};
+
 export const processCodeYellowAlerts = (alerts) => {
-  const activeTitles = new Set();
+  const activeTitles = [];
   const greenClosers = [];
 
   alerts.forEach((item) => {
@@ -8,15 +49,18 @@ export const processCodeYellowAlerts = (alerts) => {
     if (title.includes("code yellow")) {
       const base = title.split("-").slice(1).join("-").trim();
       if (!/update|techops.*test/.test(title)) {
-        activeTitles.add(base);
+        const isDuplicate = activeTitles.some(t => areTitlesEquivalent(t, base));
+        if (!isDuplicate) activeTitles.push(base);
       }
     } else if (title.includes("code green")) {
       greenClosers.push(title);
     }
   });
 
-  return { open: activeTitles.size, closed: 0, active: [...activeTitles], greenClosers };
+  return { open: activeTitles.length, closed: 0, active: [...activeTitles], greenClosers };
 };
+
+
 
 export const applyGreenClosures = ({ open, closed, active, greenClosers }) => {
   const activeSet = new Set(active);
@@ -24,9 +68,11 @@ export const applyGreenClosures = ({ open, closed, active, greenClosers }) => {
   let closedCount = closed;
 
   greenClosers.forEach((title) => {
-    const base = title.split("-").slice(1).join("-").trim();
-    if (activeSet.has(base)) {
-      activeSet.delete(base);
+    const match = [...activeSet].find(activeTitle =>
+      areTitlesEquivalent(activeTitle, title)
+    );
+    if (match) {
+      activeSet.delete(match);
       openCount--;
       closedCount++;
     }
@@ -34,6 +80,7 @@ export const applyGreenClosures = ({ open, closed, active, greenClosers }) => {
 
   return { open: openCount, closed: closedCount, active: [...activeSet] };
 };
+
 
 
 
