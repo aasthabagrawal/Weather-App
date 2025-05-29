@@ -1,3 +1,47 @@
+export const processCodeYellowAlerts = (alerts) => {
+  const activeTitles = new Set();
+  const greenClosers = [];
+
+  alerts.forEach((item) => {
+    const title = item.reportSummary?.title?.toLowerCase() || "";
+
+    if (title.includes("code yellow")) {
+      const base = title.split("-").slice(1).join("-").trim();
+      if (!/update|techops.*test/.test(title)) {
+        activeTitles.add(base);
+      }
+    } else if (title.includes("code green")) {
+      greenClosers.push(title);
+    }
+  });
+
+  return { open: activeTitles.size, closed: 0, active: [...activeTitles], greenClosers };
+};
+
+export const applyGreenClosures = ({ open, closed, active, greenClosers }) => {
+  const activeSet = new Set(active);
+  let openCount = open;
+  let closedCount = closed;
+
+  greenClosers.forEach((title) => {
+    const base = title.split("-").slice(1).join("-").trim();
+    if (activeSet.has(base)) {
+      activeSet.delete(base);
+      openCount--;
+      closedCount++;
+    }
+  });
+
+  return { open: openCount, closed: closedCount, active: [...activeSet] };
+};
+
+
+
+
+
+
+
+
 import axios from 'axios';
 import stringSimilarity from 'string-similarity';
 
