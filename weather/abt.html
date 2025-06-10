@@ -77,6 +77,58 @@ export default DetailsPage;
 
 
 
+// App.js
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Routes, Route, useNavigate } from 'react-router-dom';
+import { fetchAlerts } from './api/fetchAlerts';
+import { processAlerts } from './utils/processAlerts';
+import PieChartComponent from './components/PieChartComponent';
+import DetailsPage from './pages/DetailsPage';
+import './styles.css';
+
+const Dashboard = () => {
+  const [alertData, setAlertData] = useState({ open: 0, closed: 0, allOpenTitles: [] });
+  const navigate = useNavigate();
+
+  const getData = async () => {
+    const searchResults = await fetchAlerts();
+    if (searchResults) {
+      const processed = processAlerts(searchResults);
+      setAlertData(processed);
+    }
+  };
+
+  useEffect(() => {
+    getData();
+    const interval = setInterval(getData, 10000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleChartClick = () => {
+    // Navigate to details page with openTitles
+    navigate('/details', { state: { openTitles: alertData.allOpenTitles || [] } });
+  };
+
+  return (
+    <div className="app-container">
+      <h1>Alert Status Dashboard</h1>
+      <div onClick={handleChartClick}>
+        <PieChartComponent data={alertData} title="High Alerts" />
+      </div>
+    </div>
+  );
+};
+
+const App = () => (
+  <Router>
+    <Routes>
+      <Route path="/" element={<Dashboard />} />
+      <Route path="/details" element={<DetailsPage />} />
+    </Routes>
+  </Router>
+);
+
+export default App;
 
 
 
