@@ -1,3 +1,57 @@
+const PieChartComponent = ({ data, title }) => {
+  const openCount = data.open || 0;
+  const closedCount = data.closed || 0;
+
+  const pieData = [
+    { name: 'Open', value: openCount },
+    { name: 'Closed', value: closedCount },
+  ];
+
+  const total = openCount + closedCount;
+
+  // If both are zero, show one dummy entry to force render
+  const chartData = total === 0
+    ? [{ name: 'No Alerts', value: 1 }]
+    : pieData;
+
+  const chartColors = total === 0
+    ? ['#FF8042'] // Default yellow-orange
+    : COLORS;
+
+  return (
+    <div style={{ textAlign: 'center', marginBottom: '40px' }}>
+      <h2>{title}</h2>
+      <PieChart width={400} height={300}>
+        <Pie
+          data={chartData}
+          cx={200}
+          cy={150}
+          innerRadius={50}
+          outerRadius={100}
+          fill="#8884d8"
+          dataKey="value"
+          label={({ name, value }) => `${name}: ${total === 0 ? 0 : value}`}
+        >
+          {chartData.map((entry, index) => (
+            <Cell key={`Cell-${index}`} fill={chartColors[index % chartColors.length]} />
+          ))}
+        </Pie>
+        <Tooltip />
+      </PieChart>
+    </div>
+  );
+};
+
+
+
+
+
+
+
+
+
+
+
 <!DOCTYPE html>
 <html>
 <head>
