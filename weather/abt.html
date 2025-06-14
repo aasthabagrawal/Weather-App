@@ -1,4 +1,83 @@
 import React, { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
+
+const DetailsPage = () => {
+  const location = useLocation();
+  const openTitles = location.state?.openTitles || [];  // 👈 dynamic data from routing
+
+  const [tableData, setTableData] = useState([]);
+
+  useEffect(() => {
+    const processed = openTitles.map((title, index) => {
+      const regSci = /regsc/i.test(title) ? 'Yes' : 'No';
+
+      let appSystem = '';
+      const appMatch = title.match(/HIGH ALERT[:\-]?\s*(.*?)\s*-+/i);
+      if (appMatch && appMatch[1]) {
+        appSystem = appMatch[1].trim();
+      }
+
+      return {
+        srNo: index + 1,
+        title,
+        regSci,
+        appSystem
+      };
+    });
+
+    setTableData(processed);
+  }, [openTitles]);
+
+  return (
+    <div style={{ padding: '30px' }}>
+      <h2>Open Alerts Table</h2>
+      <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+        <thead>
+          <tr>
+            <th style={thStyle}>Sr. No.</th>
+            <th style={thStyle}>Title</th>
+            <th style={thStyle}>RegSci</th>
+            <th style={thStyle}>App/System</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tableData.map((row, idx) => (
+            <tr key={idx}>
+              <td style={tdStyle}>{row.srNo}</td>
+              <td style={tdStyle}>{row.title}</td>
+              <td style={tdStyle}>{row.regSci}</td>
+              <td style={tdStyle}>{row.appSystem}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+const thStyle = {
+  border: '1px solid #ccc',
+  padding: '8px',
+  backgroundColor: '#f4f4f4'
+};
+
+const tdStyle = {
+  border: '1px solid #ddd',
+  padding: '8px'
+};
+
+export default DetailsPage;
+
+
+
+
+
+
+
+
+
+
+import React, { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 
 const DetailsPage = () => {
