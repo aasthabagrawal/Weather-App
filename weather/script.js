@@ -1,3 +1,64 @@
+import { useLocation } from 'react-router-dom';
+
+const DetailsPage = () => {
+  const location = useLocation();
+  const openTitles = location.state?.openTitles || [];
+
+  const [tableData, setTableData] = useState([]);
+
+  useEffect(() => {
+    const processed = openTitles.map((title, index) => {
+      let regSci = /regsc/i.test(title) ? 'Yes' : 'No';
+      let appSystem = '';
+
+      const parts = title.split('-');
+      if (parts.length >= 2) {
+        appSystem = parts[1].trim(); // Part after "HIGH ALERT:"
+      }
+
+      return {
+        srNo: index + 1,
+        title,
+        regSci,
+        appSystem,
+      };
+    });
+
+    setTableData(processed);
+  }, [openTitles]);
+
+  return (
+    <div>
+      <h2>Open Alerts Table</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Sr. No.</th>
+            <th>Title</th>
+            <th>RegSci</th>
+            <th>App/System</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tableData.map(row => (
+            <tr key={row.srNo}>
+              <td>{row.srNo}</td>
+              <td>{row.title}</td>
+              <td>{row.regSci}</td>
+              <td>{row.appSystem}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+
+
+
+
+
 import stringSimilarity from 'string-similarity';
 
 const noiseWords = new Set([
