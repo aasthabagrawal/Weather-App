@@ -1,3 +1,64 @@
+app.get("/api/body/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const xmlBody = `
+      <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
+        <soap:Body>
+          <getReportBodyById>
+            <authorization>
+              <user>${process.env.USERNAME}</user>
+              <password>${process.env.PASSWORD}</password>
+            </authorization>
+            <reportId>${id}</reportId>
+          </getReportBodyById>
+        </soap:Body>
+      </soap:Envelope>`;
+
+    const { data: responseXml } = await axios.post(
+      process.env.MIR3_BODY_API,
+      xmlBody,
+      {
+        headers: {
+          Accept:       "text/xml",
+          "Content-Type": "text/xml",
+          "x-rapid-api-key": process.env.RAPID_API_KEY
+        },
+        httpsAgent: new https.Agent({ rejectUnauthorized: false })
+      }
+    );
+
+    xml2js.parseString(
+      responseXml,
+      { explicitArray: false },
+      (err, result) => {
+        if (err)
+          return res.status(500).json({ error: "XML parsing error" });
+
+        const bodyText =
+          result["soap:Envelope"]["soap:Body"].getReportBodyByIdResponse
+            .body;
+        res.json({ id, body: bodyText });
+      }
+    );
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: `body fetch failed for ${id}` });
+  }
+});
+
+const { open, closed, activeAlerts } = processAlerts(data);
+const openIds = data
+  .filter(item => activeAlerts.has(
+    item.reportSummary?.title?.toLowerCase()
+      .replace(/ - final update$/, '')
+      .replace(/ - update #?\d*$/, '')
+      .trim()
+  ))
+  .map(item => item.reportSummary?.id);  // or whatever ID field you have
+
+
+
+
 import React, { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 
