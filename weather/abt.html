@@ -1,6 +1,48 @@
 app.get("/api/body/:id", async (req, res) => {
   const { id } = req.params;
   try {
+    const xmlBody = `...`; // your body with <reportId>${id}</reportId>
+
+    const { data: responseXml } = await axios.post(
+      process.env.MIR3_BODY_API,
+      xmlBody,
+      {
+        headers: {
+          Accept: "text/xml",
+          "Content-Type": "text/xml",
+        },
+        httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+      }
+    );
+
+    // 👉 Add this parsing logic here:
+    xml2js.parseString(responseXml, { explicitArray: false }, (err, result) => {
+      if (err) {
+        return res.status(500).json({ error: "XML parsing error" });
+      }
+
+      try {
+        const text =
+          result['soapenv:Envelope']['soapenv:Body']['response']
+            ['getNotificationReportsResponse']['notificationReport']
+            ['verbiage']['text']['_']; // actual message text
+
+        res.json({ id, body: text });
+      } catch (e) {
+        console.error("Unexpected XML format", e);
+        res.status(500).json({ error: "Failed to extract body text" });
+      }
+    });
+  } catch (error) {
+    console.error("Body fetch failed", error);
+    res.status(500).json({ error: "Request failed" });
+  }
+});
+
+
+app.get("/api/body/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
     const xmlBody = `
       <soap:Envelope xmlns:soap="http://schemas.xmlsoap.org/soap/envelope/">
         <soap:Body>
