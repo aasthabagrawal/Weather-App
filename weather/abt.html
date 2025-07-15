@@ -1,3 +1,35 @@
+const xml2js = require("xml2js");
+
+xml2js.parseString(
+  responseXml,
+  {
+    explicitArray: false,
+    tagNameProcessors: [xml2js.processors.stripPrefix] // ← STRIPS `soapenv:`, `ws:` etc
+  },
+  (err, result) => {
+    if (err) {
+      return res.status(500).json({ error: "XML parsing error" });
+    }
+
+    try {
+      const text =
+        result.Envelope?.Body?.response
+          ?.getNotificationReportsResponse?.notificationReport
+          ?.verbiage?.text?._;
+
+      console.log("BODY:", text);
+      console.log("WORKING");
+
+      res.json({ id, body: text || "No body found" });
+    } catch (e) {
+      console.error("Unexpected XML format", e);
+      res.status(500).json({ error: "Failed to extract body text" });
+    }
+  }
+);
+
+
+
 const openIds = searchResults
   .filter(item =>
     processed.openTitles.includes(
