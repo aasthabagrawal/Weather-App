@@ -1,3 +1,40 @@
+const openIds = searchResults
+  .filter(item =>
+    processed.openTitles.includes(
+      item.reportSummary?.title?.toLowerCase()
+        .replace(/ - final update$/, '')
+        .replace(/ - update #?\d*$/, '')
+        .trim()
+    )
+  )
+  .map(item => ({
+    id: item.reportSummary?.id,
+    title: item.reportSummary?.title
+  }));
+
+const fetchBody = async (id) => {
+  try {
+    const res = await axios.get(`http://localhost:4000/api/body/${id}`);
+    return res.data.body;
+  } catch {
+    return "Body not available";
+  }
+};
+
+const enriched = await Promise.all(
+  openIds.map(async ({ id, title }) => ({
+    title,
+    id,
+    body: await fetchBody(id)
+  }))
+);
+
+
+
+
+
+
+
 useEffect(() => {
   if (enrichedOpenAlerts.length === 0) return;
 
